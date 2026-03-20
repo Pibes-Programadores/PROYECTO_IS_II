@@ -60,10 +60,12 @@ public class App {
 
         // --- Filtro 'after' para cerrar la conexión a la base de datos ---
         // Este filtro se ejecuta después de que cada solicitud HTTP ha sido procesada.
-        after((req, res) -> {
+        afterAfter((req, res) -> {
             try {
                 // Cierra la conexión a la base de datos para liberar recursos.
-                Base.close();
+                if (Base.hasConnection()) {
+                    Base.close();
+                }
             } catch (Exception e) {
                 // Si ocurre un error al cerrar la conexión, se registra.
                 System.err.println("Error al cerrar conexión con ActiveJDBC: " + e.getMessage());
@@ -172,7 +174,7 @@ public class App {
             try {
                 // Conversión de tipos (DNI y Teléfono llegan como String del formulario)
                 Integer dni = Integer.parseInt(dniStr);
-                Integer phone = (phoneStr != null && !phoneStr.isEmpty()) ? Integer.parseInt(phoneStr) : null;
+                Long phone = (phoneStr != null && !phoneStr.isEmpty()) ? Long.parseLong(phoneStr) : null;
 
                 // Validación de Duplicados (Regla de Negocio (HISTORIA DE USUARIO))
                 // Buscamos si ya existe un profesor con ese DNI
@@ -188,6 +190,7 @@ public class App {
                 teacher.set("lastName", lastName);
                 teacher.set("dni", dni);
                 teacher.set("phone", phone);
+                //El teacher.set("phone", phone); SE ROMPE CON NUMEROS LARGOS
                 teacher.set("address", address);
 
                 teacher.saveIt(); // Guarda en la DB

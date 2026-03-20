@@ -39,11 +39,11 @@ public class Teacher extends Model {
         set("address", address); // Establece el valor para la columna 'address'
     }
 
-    public Integer getPhone() {
-        return getInteger("phone"); // Obtenermos el telefono
+    public Long getPhone() {
+        return getLong("phone"); // Obtenermos el telefono
     } 
 
-    public void setPhone(Integer phone) {
+    public void setPhone(Long phone) {
         set("phone", phone); // Establece el valor para la columna 'phone'
     }
 }
