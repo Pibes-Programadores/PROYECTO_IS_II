@@ -14,7 +14,7 @@
 ## B) Usuarios del Sistema
 
 * Gestores de Sistema: Administradores con permisos totales para gestionar el alta y baja del personal de Secretaría Académica.
-* Administrativa: Responsables de la gestión operativa: creación de Carreras, Materias y asignación de Docentes.
+* Secretaría Académica: Responsables de la gestión operativa: creación de Carreras, Materias y asignación de Docentes.
 * Profesores: Usuarios encargados de la gestión académica directa: carga de notas, avisos y reserva de recursos (aulas).
 * Estudiantes: Usuarios finales que interactúan con el sistema para inscripciones a materias y exámenes, sujetos a condiciones de correlatividad.
 
