@@ -1,4 +1,4 @@
-## 📝 Resumen de que se hizo
+## Resumen de que se hizo
 
 Se realizó la migración completa del motor de persistencia de **SQLite** a **MySQL/MariaDB** para escalar el sistema según los requerimientos de Ingeniería de Software II.
 
@@ -27,38 +27,135 @@ Se realizó la migración completa del motor de persistencia de **SQLite** a **M
 
 ---
 
-## 🚀 Guía de puesta en marcha
+## Guía de puesta en marcha
 
 Para cualquiera que quiera correr el proyecto en su PC, debe seguir estos pasos exactos para que el sistema no "explote" al iniciar:
 
 ### 1. Preparar el motor (Servidor)
 
-Deben tener instalado MySQL o MariaDB.
+Deben tener instalado MariaDB.
 
-- **Paso A:** Asegurarse de que el servicio esté corriendo (`systemctl start mariadb` en Linux o desde el panel de XAMPP en Windows).
+#### 🛠 Configuración de MariaDB
+
+Para que el proyecto funcione, es necesario tener instalado el motor de base de datos **MariaDB** y configurar un usuario específico para el desarrollo.
+
+##### 1. Instalación por Sistema Operativo
+
+###### Arch Linux
+
+En Arch, la instalación es manual y requiere inicializar el directorio de datos.
+
+1. **Instalar:** 
+```bash
+sudo pacman -S mariadb
+```
     
-- **Paso B:** Crear el usuario de desarrollo. Desde la consola de MySQL:
+2. **Inicializar:** 
+```bash
+sudo mariadb-install-db --user=mysql --basedir=/usr --datadir=/var/lib/mysql
+```
     
-    SQL
-    
-    ```bash
-    CREATE USER 'dev'@'localhost' IDENTIFIED BY ''; -- Contraseña vacía
-    GRANT ALL PRIVILEGES ON proyecto_is_ii.* TO 'dev'@'localhost';
-    FLUSH PRIVILEGES;
-    ```
+3. **Arrancar servicio:** 
+```bash
+sudo systemctl enable --now mariadb
+```
     
 
-### 2. Crear la Base de Datos
+###### Linux Mint / Ubuntu / Debian
 
+En estas distros, el proceso está automatizado.
+
+1. **Instalar:** 
+```bash
+sudo apt update && sudo apt install mariadb-server
+```
+    
+2. **Verificar:** El servicio arranca solo. Comprobar con `
+```bash
+systemctl status mariadb
+```
+    
+
+Debe decir algo del estilo:
+```Shell
+systemctl status mariadb  
+● mariadb.service - MariaDB 12.2.2 database server  
+    Loaded: loaded (/usr/lib/systemd/system/mariadb.service; enabled; preset: disabled)  
+    Active: active (running) since Sat 2026-04-18 20:05:26 -03; 17h ago  
+Invocation: c450f49408fa4b8f8397b02dcbb494f9
+```
+
+###### Windows
+
+La opción más sencilla para el equipo es usar **XAMPP**.
+
+1. **Descargar:** Instalar XAMPP desde el sitio oficial.
+    
+2. **Arrancar:** Abrir el _XAMPP Control Panel_ y darle a **Start** en el módulo de MySQL.
+	
+##### 2. Inicializar la base de datos (Paso obligatorio en Arch)
+
+A diferencia de otras distros, en Arch tenés que crear el directorio de datos manualmente antes de arrancar el servicio por primera vez:
+
+```Bash
+sudo mariadb-install-db --user=mysql --basedir=/usr --datadir=/var/lib/mysql
+```
+
+##### 3. Iniciar y habilitar el servicio (Arch)
+
+Ahora sí, arrancamos el motor y hacemos que se inicie solo cada vez que prendas la compu:
+
+```Bash
+sudo systemctl enable --now mariadb
+```
+
+---
+
+### 2. Entrá a la base de datos por terminal
+
+**Linux:** Como el socket te pide privilegios de sistema, tirá este comando:
+
+```Bash
+sudo mariadb -u root
+```
+
+**Windows:** Clic en el botón "Shell" de XAMPP y escribir `mysql -u root`.
+
+---
+
+### 3.  Configuración del Usuario del Proyecto ('dev')
+
+Una vez que veas el prompt `MariaDB [(none)]>`, pegá estas líneas una por una:
+
+```SQL
+-- 1. Crear el usuario de desarrollo (sin contraseña para entorno local) 
+CREATE USER 'dev'@'localhost' IDENTIFIED BY ''; 
+-- 2. Otorgar permisos totales sobre la base del proyecto 
+GRANT ALL PRIVILEGES ON proyecto_is_ii.* TO 'dev'@'localhost'; 
+-- 3. Aplicar cambios 
+FLUSH PRIVILEGES; 
+-- 4. Salir 
+EXIT;
+```
+
+---
+
+### 4. Crear la Base de Datos
 Deben crear la "caja" vacía antes de ejecutar el programa:
-A) Mediante MySQL Workbench deben crear una nueva conexión:
+#### A) 
+Mediante MySQL Workbench deben crear una nueva conexión:
 ![[Paso1.png]]
 
-B) Una vez le damos al (*+*) Se nos abre la siguiente pestaña:
+#### B) 
+Una vez le damos al (*+*) Se nos abre la siguiente pestaña:
 ![[Paso2.png]]
 IMPORTANTE DEJARLO TAL CUAL COMO FIGURA EN LA IMAGEN. ADEMAS POR LAS DUDAS, DARLE A *CLEAR* EN *PASSWORD*.
 
-C) Una vez dentro de la conexión, en *Query 1* pegamos lo siguiente:
+> [!NOTE] NOTA
+> Si Workbench no te deja entrar como root, ejecutá en la terminal `sudo mariadb -u root` y luego `ALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('');`, finalmente en la terminal `EXIT;`
+
+#### C) 
+Una vez dentro de la conexión, en *Query 1* pegamos lo siguiente:
 
 ```SQL
 CREATE DATABASE proyecto_is_ii;
@@ -68,7 +165,8 @@ Luego, le damos a refrescar en la sección de *Schemas*. Debería quedarnos:
 ![[Paso3.png]]
 Fijarse bien de que la DB *proyecto_is_ii* salga en **NEGRITA**.
 
-D) Ya tenemos la DB, ahora carguemos las tablas, vamos a *File* arriba a la izquierda y le damos a *Open SQL Script* y seleccionamos nuestro scheme.sql que esta en *PROYECTO_IS_II/Proyecto_IS_II/src/main/resources/*:
+#### D) 
+Ya tenemos la DB, ahora carguemos las tablas, vamos a *File* arriba a la izquierda y le damos a *Open SQL Script* y seleccionamos nuestro scheme.sql que esta en *PROYECTO_IS_II/Proyecto_IS_II/src/main/resources/*:
 ![[Paso4.png]]
 Una vez dentro de *scheme* le damos al rayito, refrescamos en Schemas bien a la izquierda de las pestañas *Query 1* y *scheme*, se debería ver tal que así:
 ![[Paso5.png]]
@@ -77,7 +175,7 @@ Una vez dentro de *scheme* le damos al rayito, refrescamos en Schemas bien a la 
 Con todo esto ya tendriamos la nueva DB con las nuevas tablas `users` y `teacher`.
 
 
-### 3. Compilación y Ejecución
+### 5. Compilación y Ejecución
 
 Para que ActiveJDBC funcione, **no basta con darle al "Play" del IDE**. Debe usar la terminal en la raíz del proyecto con este comando:
 
