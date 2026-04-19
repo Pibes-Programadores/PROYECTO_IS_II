@@ -1,28 +1,20 @@
--- Elimina la tabla 'users' si ya existe para asegurar un inicio limpio
+-- Elimina las tablas si existen para evitar errores al recrear (orden inverso a las dependencias)
+DROP TABLE IF EXISTS teacher;
+DROP TABLE IF EXISTS users;
 
-
--- Crea la tabla 'users' con los campos originales, adaptados para SQLite
+-- Crea la tabla 'users' adaptada para MySQL
 CREATE TABLE users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, -- Clave primaria autoincremental para SQLite
-    name TEXT NOT NULL UNIQUE,          -- Nombre de usuario (TEXT es el tipo de cadena recomendado para SQLite), con restricción UNIQUE
-    password TEXT NOT NULL           -- Contraseña hasheada (TEXT es el tipo de cadena recomendado para SQLite)
+    id INT AUTO_INCREMENT PRIMARY KEY, -- En MySQL se usa AUTO_INCREMENT en lugar de AUTOINCREMENT
+    name VARCHAR(255) NOT NULL UNIQUE, -- VARCHAR es el estándar para cadenas en MySQL
+    password VARCHAR(255) NOT NULL
 );
 
-
-
+-- Crea la tabla 'teacher' adaptada para MySQL
 CREATE TABLE teacher (
-    -- 1. Usamos un 'id' autoincremental, igual que en 'users'
-    id INTEGER PRIMARY KEY AUTOINCREMENT, 
-    
-    -- 2. El DNI es un campo de texto, separado, y nos aseguramos de que sea ÚNICO
-    dni TEXT UNIQUE NOT NULL, 
-    
-    name TEXT NOT NULL,
-    lastName TEXT NOT NULL,
-    
-    -- 3. 'adress' (cuidado, se escribe 'address' con doble 'd')
-    address TEXT, 
-    
-    -- 4. El teléfono como TEXT
-    phone INTEGER
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    dni VARCHAR(20) UNIQUE NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    lastName VARCHAR(255) NOT NULL,
+    address VARCHAR(255),
+    phone BIGINT -- BIGINT para evitar que se rompa con números de teléfono largos
 );

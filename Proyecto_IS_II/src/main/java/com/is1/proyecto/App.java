@@ -46,29 +46,20 @@ public class App {
         // Este filtro se ejecuta antes de cada solicitud HTTP.
         before((req, res) -> {
             try {
-                // Abre una conexión a la base de datos utilizando las credenciales del singleton.
-                Base.open(dbConfig.getDriver(), dbConfig.getDbUrl(), dbConfig.getUser(), dbConfig.getPass());
-                System.out.println(req.url());
-
+                dbConfig.openConnection(); // Usamos el método encapsulado del Singleton
             } catch (Exception e) {
-                // Si ocurre un error al abrir la conexión, se registra y se detiene la solicitud
-                // con un código de estado 500 (Internal Server Error) y un mensaje JSON.
-                System.err.println("Error al abrir conexión con ActiveJDBC: " + e.getMessage());
-                halt(500, "{\"error\": \"Error interno del servidor: Fallo al conectar a la base de datos.\"}" + e.getMessage());
+                System.err.println("Error al abrir conexión: " + e.getMessage());
+                halt(500, "{\"error\": \"Error interno del servidor DB\"}");
             }
         });
 
-        // --- Filtro 'after' para cerrar la conexión a la base de datos ---
+        // --- Filtro 'afterAfter' para cerrar la conexión a la base de datos ---
         // Este filtro se ejecuta después de que cada solicitud HTTP ha sido procesada.
         afterAfter((req, res) -> {
             try {
-                // Cierra la conexión a la base de datos para liberar recursos.
-                if (Base.hasConnection()) {
-                    Base.close();
-                }
+                dbConfig.closeConnection(); // Usamos el método encapsulado
             } catch (Exception e) {
-                // Si ocurre un error al cerrar la conexión, se registra.
-                System.err.println("Error al cerrar conexión con ActiveJDBC: " + e.getMessage());
+                System.err.println("Error al cerrar conexión: " + e.getMessage());
             }
         });
 

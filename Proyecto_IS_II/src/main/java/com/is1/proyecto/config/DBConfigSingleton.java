@@ -1,26 +1,29 @@
 // Archivo: com/is1/proyecto/config/DBConfigSingleton.java
 package com.is1.proyecto.config;
 
-import org.javalite.activejdbc.Base; // Necesitarás esta importación para usar Base.open y Base.close
+import org.javalite.activejdbc.Base;
 
 public final class DBConfigSingleton {
 
     private static DBConfigSingleton instance;
 
-    // Ya no es necesario que sean final si los vas a configurar dinámicamente o mantener una sola instancia
     private final String dbUrl;
     private final String user;
     private final String pass;
     private final String driver;
 
-    // Constructor privado para evitar instanciación directa
     private DBConfigSingleton() {
-        // Configuraciones para SQLite
-        this.driver = "org.sqlite.JDBC"; // Driver JDBC para SQLite
-        this.dbUrl = System.getProperty("db.url", "jdbc:sqlite:./db/dev.db");
-        //this.dbUrl = "jdbc:sqlite:C:\\Users\\lauta\\Desktop\\proyecto_luka\\is1_2025_eti_copia_FUNCIONA\\db\\dev.db";
-        this.user = ""; // SQLite no usa usuario
-        this.pass = ""; // SQLite no usa contraseña
+        this.driver = "com.mysql.cj.jdbc.Driver"; // Nuevo driver de MySQL
+
+        // Leemos variables de entorno (ideal para prod), si no existen, usamos valores por defecto (dev)
+        String envUrl = System.getenv("DB_URL");
+        this.dbUrl = (envUrl != null) ? envUrl : "jdbc:mysql://localhost:3306/proyecto_is_ii?useSSL=false&serverTimezone=UTC";
+
+        String envUser = System.getenv("DB_USER");
+        this.user = (envUser != null) ? envUser : "dev";
+
+        String envPass = System.getenv("DB_PASS");
+        this.pass = (envPass != null) ? envPass : ""; // Contraseña por defecto de XAMPP local
     }
 
     public static synchronized DBConfigSingleton getInstance() {
@@ -30,31 +33,21 @@ public final class DBConfigSingleton {
         return instance;
     }
 
-    // Métodos para abrir y cerrar la conexión
     public void openConnection() {
-        // Utiliza los valores de las propiedades de la clase para abrir la conexión
-        Base.open(this.driver, this.dbUrl, this.user, this.pass);
+        if (!Base.hasConnection()) {
+            Base.open(this.driver, this.dbUrl, this.user, this.pass);
+        }
     }
 
     public void closeConnection() {
-        Base.close();
+        if (Base.hasConnection()) {
+            Base.close();
+        }
     }
 
-    // Getters existentes
-    public String getDbUrl() {
-        return dbUrl;
-    }
-
-    public String getUser() {
-        return user;
-    }
-
-    public String getPass() {
-        return pass;
-    }
-
-    public String getDriver() {
-        return driver;
-    }
+    // Getters
+    public String getDbUrl() { return dbUrl; }
+    public String getUser() { return user; }
+    public String getPass() { return pass; }
+    public String getDriver() { return driver; }
 }
-
