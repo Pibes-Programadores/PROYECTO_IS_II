@@ -82,3 +82,15 @@ CREATE TABLE sesion (
         FOREIGN KEY (usuario_id) REFERENCES users(id) 
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
+-- SCRIPT DE INICIALIZACIÓN (SEED)
+-- Creamos el superusuario por defecto para todo el equipo
+INSERT IGNORE INTO users (dni, nombre, apellido, nombre_usuario, password, nivel_acceso) 
+VALUES (
+    '00000000', 
+    'Administrador', 
+    'Sistema', 
+    'admin', 
+    '$2a$10$vI8tmZH.RYv4uV9tf.X8su6U2S0.M.G8Y.199321.123', -- Esta es la clave 'admin' hasheada (reemplazala por el hash real que tengas en tu BD)
+    'ADMIN'
+);
