@@ -1,4 +1,8 @@
+com/is1/proyecto/models/GestorSistema.class
 com/is1/proyecto/App.class
 com/is1/proyecto/models/User.class
-com/is1/proyecto/models/Teacher.class
+com/is1/proyecto/models/Student.class
 com/is1/proyecto/config/DBConfigSingleton.class
+com/is1/proyecto/models/SecretariaAcademica.class
+com/is1/proyecto/models/Teacher.class
+com/is1/proyecto/models/Sesion.class
