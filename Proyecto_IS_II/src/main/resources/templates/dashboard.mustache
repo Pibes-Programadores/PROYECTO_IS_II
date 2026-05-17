@@ -15,7 +15,7 @@
         {{/username}}
         {{^username}}
         <p class="text-xl text-center text-gray-50 mb-8">¡Bienvenido!</p>
-        {{/username}} 
+        {{/username}}
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <div class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-lg w-full max-w-2xl">
@@ -28,11 +28,13 @@
                 <p class="text-gray-50 mb-4">Ajusta las preferencias de tu aplicación.</p>
                 <a href="/settings" class="inline-block bg-pink-600 text-white py-2 px-4 rounded-md hover:bg-pink-900 transition duration-300">Configuración</a>
             </div>
+            {{#isAdmin}}
             <div class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-lg w-full max-w-2xl">
                 <h2 class="text-2xl font-bold text-orange-400 mb-3">Cargar un docente</h2>
                 <p class="text-gray-50 mb-4">Gestionar el alta de un docente de la universidad.</p>
                 <a href="/teacher/new" class="inline-block bg-orange-500 text-white py-2 px-4 rounded-md hover:bg-orange-700 transition duration-300">Cargar</a>
             </div>
+            {{/isAdmin}}
         </div>
 
         <div class="text-center mt-6">

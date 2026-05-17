@@ -1,49 +1,46 @@
 package com.is1.proyecto.models;
 
 import org.javalite.activejdbc.Model;
+import org.javalite.activejdbc.annotations.BelongsTo;
 import org.javalite.activejdbc.annotations.Table;
 
-
-@Table("teacher") // Esta anotación asocia explícitamente el modelo 'Teacher' con la tabla 'teachers' en la DB.
+@Table("teacher")
+@BelongsTo(parent = User.class, foreignKeyName = "usuario_id")
 public class Teacher extends Model {
 
-    public Integer getDocumento() {
-        return getInteger("dni"); // Obtiene el dni del docente
+    public String getLegajoDocente() {
+        return getString("legajo_docente");
     }
 
-    public void setDocumento(Integer dni) {
-        set("dni", dni); // Establece el valor para la columna 'dni'
+    public void setLegajoDocente(String l) {
+        set("legajo_docente", l);
     }
 
-    public String getName() {
-        return getString("name"); // Obtenemos el nombre
+    public String getCuil() {
+        return getString("cuil");
     }
 
-    public void setName(String name) {
-        set("name", name); // Establece el valor para la columna 'name'
+    public void setCuil(String c) {
+        set("cuil", c);
     }
 
-    public String getLastName(){
-        return getString("lastName"); // Obtenemos el apellido
+    public String getEmail() {
+        return getString("email");
     }
 
-    public void setLastName(String lastName) {
-        set("lastName", lastName); // Establece el valor para la columna 'lastName'
+    public void setEmail(String e) {
+        set("email", e);
     }
 
-    public String getAddress() {
-        return getString("address"); // Obetenemos la direccion
-    } 
-
-    public void setAddress(String address) {
-        set("address", address); // Establece el valor para la columna 'address'
+    public String getEspecialidad() {
+        return getString("especialidad");
     }
 
-    public Long getPhone() {
-        return getLong("phone"); // Obtenermos el telefono
-    } 
+    public void setEspecialidad(String es) {
+        set("especialidad", es);
+    }
 
-    public void setPhone(Long phone) {
-        set("phone", phone); // Establece el valor para la columna 'phone'
+    public User getUser() {
+        return parent(User.class);
     }
 }

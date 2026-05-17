@@ -1,28 +1,84 @@
--- Elimina la tabla 'users' si ya existe para asegurar un inicio limpio
+DROP TABLE IF EXISTS sesion;
+DROP TABLE IF EXISTS student;
+DROP TABLE IF EXISTS teacher;
+DROP TABLE IF EXISTS secretariaAcademica;
+DROP TABLE IF EXISTS gestorSistema;
+DROP TABLE IF EXISTS users;
 
-
--- Crea la tabla 'users' con los campos originales, adaptados para SQLite
+-- Creación de la Tabla Base: Usuario
+-- Usamos ENUM para Nivel_Acceso como pide el catálogo.
 CREATE TABLE users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, -- Clave primaria autoincremental para SQLite
-    name TEXT NOT NULL UNIQUE,          -- Nombre de usuario (TEXT es el tipo de cadena recomendado para SQLite), con restricción UNIQUE
-    password TEXT NOT NULL           -- Contraseña hasheada (TEXT es el tipo de cadena recomendado para SQLite)
-);
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    dni VARCHAR(20) NOT NULL UNIQUE,
+    nombre VARCHAR(100) NOT NULL,
+    apellido VARCHAR(100) NOT NULL,
+    direccion VARCHAR(255),
+    telefono VARCHAR(50),
+    nombre_usuario VARCHAR(100) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    nivel_acceso ENUM('ESTUDIANTE', 'DOCENTE', 'SECRETARIA', 'ADMIN') NOT NULL,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
 
 
+-- Tabla Estudiante
+-- Relación 1:1 con Usuario. El id del estudiante es el mismo id del usuario.
+CREATE TABLE student (
+    usuario_id INT PRIMARY KEY,
+    legajo VARCHAR(20) NOT NULL UNIQUE,
+    tipo_estudiante ENUM('REGULAR', 'VOCACIONAL', 'INTERCAMBIO') NOT NULL,
+    CONSTRAINT fk_estudiante_usuario 
+        FOREIGN KEY (usuario_id) REFERENCES users(id) 
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Tabla Docente
+CREATE TABLE teacher (
+    usuario_id INT PRIMARY KEY,
+    cuil VARCHAR(20) NOT NULL UNIQUE,
+    titulo VARCHAR(100),
+    CONSTRAINT fk_docente_usuario 
+        FOREIGN KEY (usuario_id) REFERENCES users(id) 
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
 
 CREATE TABLE teacher (
-    -- 1. Usamos un 'id' autoincremental, igual que en 'users'
-    id INTEGER PRIMARY KEY AUTOINCREMENT, 
-    
-    -- 2. El DNI es un campo de texto, separado, y nos aseguramos de que sea ÚNICO
-    dni TEXT UNIQUE NOT NULL, 
-    
-    name TEXT NOT NULL,
-    lastName TEXT NOT NULL,
-    
-    -- 3. 'adress' (cuidado, se escribe 'address' con doble 'd')
-    address TEXT, 
-    
-    -- 4. El teléfono como TEXT
-    phone INTEGER
-);
+    usuario_id INT PRIMARY KEY,
+    legajo_docente VARCHAR(50) NOT NULL UNIQUE,
+    cuil VARCHAR(20) NOT NULL UNIQUE, -- Agregado nuevamente
+    email VARCHAR(150) NOT NULL UNIQUE,
+    especialidad VARCHAR(150),
+    CONSTRAINT fk_teacher_user FOREIGN KEY (usuario_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Tabla SecretariaAcademica
+CREATE TABLE secretariaAcademica (
+    usuario_id INT PRIMARY KEY,
+    oficina VARCHAR(50),
+    interno VARCHAR(20),
+    CONSTRAINT fk_secretaria_usuario 
+        FOREIGN KEY (usuario_id) REFERENCES users(id) 
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Tabla GestorSistema (Administrador IT)
+CREATE TABLE gestorSistema (
+    usuario_id INT PRIMARY KEY,
+    area_responsabilidad VARCHAR(100),
+    CONSTRAINT fk_gestor_usuario 
+        FOREIGN KEY (usuario_id) REFERENCES users(id) 
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Tabla Sesion
+-- Implementa ON DELETE CASCADE para que si se borra el usuario, se borren sus sesiones.
+CREATE TABLE sesion (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    usuario_id INT NOT NULL,
+    token VARCHAR(255) NOT NULL UNIQUE,
+    fecha_inicio DATETIME NOT NULL,
+    fecha_expiracion DATETIME NOT NULL,
+    CONSTRAINT fk_sesion_usuario 
+        FOREIGN KEY (usuario_id) REFERENCES users(id) 
+        ON DELETE CASCADE
+) ENGINE=InnoDB;

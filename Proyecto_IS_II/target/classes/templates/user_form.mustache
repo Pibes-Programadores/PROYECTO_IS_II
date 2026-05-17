@@ -27,15 +27,28 @@
                 <input type="text" id="name" name="name" required
                        class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
+
             <div>
                 <label for="password" class="block text-[#ccd0fc] text-sm font-medium mb-1">Contraseña:</label>
                 <input type="password" id="password" name="password" required
                        class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
+
+            <div>
+                <label for="role" class="block text-[#ccd0fc] text-sm font-medium mb-1">Tipo de Usuario (Rol):</label>
+                <select id="role" name="role" required
+                        class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900">
+                    <option value="ESTUDIANTE">Estudiante</option>
+                    <option value="DOCENTE">Docente</option>
+                    <option value="SECRETARIA">Secretaría Académica</option>
+                    <option value="ADMIN">Administrador del Sistema</option>
+                </select>
+            </div>
             <button type="submit"
-                    class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                   class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
                 Registrar Usuario
             </button>
+
             <div class="text-center mt-4">
                 <a href="/" class="text-blue-600 hover:underline text-sm">Volver al inicio</a>
             </div>

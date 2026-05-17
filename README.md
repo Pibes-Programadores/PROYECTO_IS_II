@@ -96,15 +96,69 @@ Antes de comenzar, asegurate de tener instalado:
 ##  Estructura del proyecto
 
 ```
-PROYECTO_IS_II/
-├── Proyecto_IS_II/        # Código fuente principal
-│   ├── src/
-│   │   ├── main/
-│   │   │   ├── java/      # Lógica de negocio, rutas y controladores
-│   │   │   └── resources/
-│   │   │       └── templates/  # Plantillas Mustache (.hbs / .mustache)
-│   └── pom.xml            # Configuración de Maven
-└── Doc/                   # Documentación del proyecto
+Proyecto_IS_II
+├── db
+│   ├── dev.db
+│   └── prod.db
+├── pom.xml
+├── src
+│   └── main
+│      ├── java
+│      │   └── com
+│      │       └── is1
+│      │           └── proyecto
+│      │               ├── App.java
+│      │               ├── config
+│      │               │   └── DBConfigSingleton.java
+│      │               └── models
+│      │                   ├── GestorSistema.java
+│      │                   ├── SecretariaAcademica.java
+│      │                   ├── Sesion.java
+│      │                   ├── Student.java
+│      │                   ├── Teacher.java
+│      │                   └── User.java
+│      └── resources
+│          ├── scheme.sql
+│          └── templates
+│              ├── dashboard.mustache
+│              ├── error.mustache
+│              ├── hello.mustache
+│              ├── login.mustache
+│              ├── teacher_from.mustache
+│              └── user_form.mustache
+│   
+└── target
+    ├── classes
+    │   ├── activejdbc_models.properties
+    │   ├── com
+    │   │   └── is1
+    │   │       └── proyecto
+    │   │           ├── App.class
+    │   │           ├── config
+    │   │           │   └── DBConfigSingleton.class
+    │   │           └── models
+    │   │               ├── GestorSistema.class
+    │   │               ├── SecretariaAcademica.class
+    │   │               ├── Sesion.class
+    │   │               ├── Student.class
+    │   │               ├── Teacher.class
+    │   │               └── User.class
+    │   ├── scheme.sql
+    │   └── templates
+    │       ├── dashboard.mustache
+    │       ├── error.mustache
+    │       ├── hello.mustache
+    │       ├── login.mustache
+    │       ├── teacher_from.mustache
+    │       └── user_form.mustache
+    ├── generated-sources
+    │   └── annotations
+    └── maven-status
+        └── maven-compiler-plugin
+            └── compile
+                └── default-compile
+                    ├── createdFiles.lst
+                    └── inputFiles.lst
 ```
 
 ---
