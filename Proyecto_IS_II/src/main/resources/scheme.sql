@@ -98,7 +98,7 @@ CREATE TABLE Plan_Estudio (
 ) ENGINE=InnoDB;
 
 CREATE TABLE Materia (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    codigo INT PRIMARY KEY, 
     plan_estudio_id INT NOT NULL,
     nombre VARCHAR(150) NOT NULL,
     anio_cursada INT NOT NULL,
@@ -107,22 +107,22 @@ CREATE TABLE Materia (
 ) ENGINE=InnoDB;
 
 CREATE TABLE Correlatividad (
-    materia_id INT NOT NULL,
-    materia_correlativa_id INT NOT NULL,
+    materia_codigo INT NOT NULL,
+    materia_correlativa_codigo INT NOT NULL,
     condicion ENUM('REGULAR', 'APROBADA') NOT NULL DEFAULT 'APROBADA',
-    PRIMARY KEY (materia_id, materia_correlativa_id),
-    CONSTRAINT fk_corr_materia FOREIGN KEY (materia_id) REFERENCES Materia(id) ON DELETE CASCADE,
-    CONSTRAINT fk_corr_requisito FOREIGN KEY (materia_correlativa_id) REFERENCES Materia(id) ON DELETE CASCADE,
-    -- Evitar que una materia sea correlativa de sí misma:
-    CONSTRAINT chk_no_auto_correlativa CHECK (materia_id != materia_correlativa_id)
+    tipo_requisito ENUM('CURSAR', 'RENDIR') NOT NULL DEFAULT 'CURSAR', -- <- Columna agregada
+    PRIMARY KEY (materia_codigo, materia_correlativa_codigo, tipo_requisito), -- <- PK actualizada
+    CONSTRAINT fk_corr_materia FOREIGN KEY (materia_codigo) REFERENCES Materia(codigo) ON DELETE CASCADE,
+    CONSTRAINT fk_corr_requisito FOREIGN KEY (materia_correlativa_codigo) REFERENCES Materia(codigo) ON DELETE CASCADE,
+    CONSTRAINT chk_no_auto_correlativa CHECK (materia_codigo != materia_correlativa_codigo)
 ) ENGINE=InnoDB;
 
 CREATE TABLE Materia_Periodo (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    materia_id INT NOT NULL,
+    materia_codigo INT NOT NULL,         
     anio_academico INT NOT NULL,
     tipo_cuatrimestre ENUM('PRIMER_CUATRIMESTRE', 'SEGUNDO_CUATRIMESTRE', 'ANUAL', 'VERANO') NOT NULL,
-    CONSTRAINT fk_periodo_materia FOREIGN KEY (materia_id) REFERENCES Materia(id) ON DELETE CASCADE
+    CONSTRAINT fk_periodo_materia FOREIGN KEY (materia_codigo) REFERENCES Materia(codigo) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE Aula (
