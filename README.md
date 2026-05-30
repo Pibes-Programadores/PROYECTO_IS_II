@@ -93,6 +93,64 @@ Antes de comenzar, asegurate de tener instalado:
 
 ---
 
+## Solución del problema de conexión a MySQL
+
+Si la aplicación muestra un error de conexión como:
+
+- `Failed to connect to JDBC URL: jdbc:mysql://localhost:3306/proyecto_is_ii...`
+- `Access denied for user 'dev'@'localhost'`
+- `Unknown database 'proyecto_is_ii'`
+
+seguí estos pasos:
+
+1. Verifiqué que el servidor MySQL de XAMPP estaba activo.
+   - En la captura de XAMPP se veía MySQL iniciado en el puerto `3307`.
+   - Con PowerShell confirmé que el servicio `mysqld` escuchaba en `3306` y `3307`.
+
+2. Revisé la configuración de la aplicación en `src/main/java/com/is1/proyecto/config/DBConfigSingleton.java`.
+   - Allí se define la URL de conexión por defecto.
+   - Cambié la URL de `3306` a `3307`:
+     ```java
+     this.dbUrl = "jdbc:mysql://localhost:3307/proyecto_is_ii?useSSL=false&serverTimezone=UTC";
+     ```
+
+3. Probé la conexión directa al servidor MySQL de XAMPP.
+   - El puerto `3307` estaba disponible, pero aún faltaba la base de datos.
+   - El puerto `3307` respondió correctamente cuando consulté `SHOW DATABASES`.
+
+4. Creé la base de datos `proyecto_is_ii` en el servidor correcto y cargué el esquema.
+   - Usé el archivo `src/main/resources/scheme.sql`.
+   - También aseguré que el usuario `dev@localhost` existiera con contraseña vacía.
+
+5. Verifiqué que el usuario `dev` pudiera conectarse con la base recién creada:
+   - `jdbc:mysql://localhost:3307/proyecto_is_ii`
+   - usuario: `dev`
+   - contraseña: `""` (vacía)
+
+6. Después de esto, la aplicación ya pudo conectarse correctamente a MySQL.
+
+### Notas extra
+
+- Si querés usar variables de entorno, podés definir:
+  - `DB_URL`
+  - `DB_USER`
+  - `DB_PASS`
+
+- El archivo `DBConfigSingleton.java` también contiene el driver:
+  - `com.mysql.cj.jdbc.Driver`
+
+- Para evitar errores de ActiveJDBC, siempre compilá con:
+  ```bash
+  mvn clean compile process-classes exec:java
+  ```
+
+   Una vez iniciada la aplicación, abrí tu navegador e ingresá a:
+   ```
+   http://localhost:8080
+   ```
+
+---
+
 ##  Estructura del proyecto
 
 ```
