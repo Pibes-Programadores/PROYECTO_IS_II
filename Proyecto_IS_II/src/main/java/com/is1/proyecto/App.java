@@ -13,6 +13,8 @@ import com.is1.proyecto.models.PlanEstudio;
 import com.is1.proyecto.models.Materia;
 import com.is1.proyecto.models.MateriaPeriodo;
 import com.is1.proyecto.models.Correlatividad;
+import com.is1.proyecto.models.DocenteMateria;
+import java.util.ArrayList;
 import java.util.List;
 
 // Importaciones específicas para ActiveJDBC (ORM para la base de datos)
@@ -24,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap; // Para crear mapas de datos (modelos para las plantillas).
 import java.util.Map; // Interfaz Map, utilizada para Map.of() o HashMap.
 import org.javalite.activejdbc.Base; // Clase central de ActiveJDBC para gestionar la conexión a la base de datos.
+import org.javalite.activejdbc.Model;
 import org.mindrot.jbcrypt.BCrypt; // Utilidad para hashear y verificar contraseñas de forma segura.
 // Importaciones de Spark para renderizado de plantillas
 import spark.ModelAndView; // Representa un modelo de datos y el nombre de la vista a renderizar.
@@ -104,6 +107,15 @@ public class App {
                 // 3. Pasamos los datos a la vista (Mustache)
                 model.put("username", currentUsername);
 
+                String errorMessage = req.queryParams("error");
+                if (errorMessage != null && !errorMessage.isEmpty()) {
+                    model.put("errorMessage", errorMessage);
+                }
+                String successMessage = req.queryParams("message");
+                if (successMessage != null && !successMessage.isEmpty()) {
+                    model.put("successMessage", successMessage);
+                }
+
                 // Creamos "banderas" (true/false) para que el HTML decida qué mostrar
                 model.put(
                     "isAdmin",
@@ -141,6 +153,72 @@ public class App {
 
                 // Renderizamos la vista.
                 return new ModelAndView(model, "teacher_from.mustache");
+            },
+            new MustacheTemplateEngine()
+        );
+
+        get(
+            "/teacher/assign-materia",
+            (req, res) -> {
+                String userRole = req.session().attribute("userRole");
+                if (userRole == null || !userRole.equals("SECRETARIA")) {
+                    String errorMessage = URLEncoder.encode(
+                        "Acceso denegado. Solo SECRETARIA puede asignar materias.",
+                        StandardCharsets.UTF_8.toString()
+                    );
+                    res.redirect("/dashboard?error=" + errorMessage);
+                    return null;
+                }
+
+                Map<String, Object> model = new HashMap<>();
+                String successMessage = req.queryParams("message");
+                String errorMessage = req.queryParams("error");
+                if (successMessage != null && !successMessage.isEmpty()) {
+                    model.put("successMessage", successMessage);
+                }
+                if (errorMessage != null && !errorMessage.isEmpty()) {
+                    model.put("errorMessage", errorMessage);
+                }
+
+                List<Map<String, Object>> teacherOptions = new ArrayList<>();
+                for (Model teacherRecord : Teacher.findAll()) {
+                    Teacher teacher = (Teacher) teacherRecord;
+                    User user = teacher.getUser();
+                    String label = "";
+                    Integer teacherId = teacher.getInteger("usuario_id");
+                    if (user != null) {
+                        label =
+                            user.getString("apellido") + ", " +
+                            user.getString("nombre") +
+                            " — " +
+                            teacher.getLegajoDocente();
+                    } else {
+                        label = "Docente #" + teacherId;
+                    }
+                    Map<String, Object> option = new HashMap<>();
+                    option.put("id", teacherId);
+                    option.put("label", label);
+                    teacherOptions.add(option);
+                }
+
+                List<Map<String, Object>> materiaOptions = new ArrayList<>();
+                for (Model materiaRecord : Materia.findAll()) {
+                    Materia materia = (Materia) materiaRecord;
+                    Map<String, Object> option = new HashMap<>();
+                    option.put("id", materia.getInteger("codigo"));
+                    option.put(
+                        "label",
+                        materia.getInteger("codigo") +
+                        " - " +
+                        materia.getString("nombre")
+                    );
+                    materiaOptions.add(option);
+                }
+
+                model.put("teachers", teacherOptions);
+                model.put("materias", materiaOptions);
+
+                return new ModelAndView(model, "assign_materia_form.mustache");
             },
             new MustacheTemplateEngine()
         );
@@ -816,6 +894,93 @@ public class App {
                     StandardCharsets.UTF_8.toString()
                 );
                 res.redirect("/teacher/new?error=" + errorCodificado);
+                return "";
+            }
+        });
+
+        post("/teacher/assign-materia", (req, res) -> {
+            String userRole = req.session().attribute("userRole");
+            if (userRole == null || !userRole.equals("SECRETARIA")) {
+                String errorMessage = URLEncoder.encode(
+                    "Acceso denegado. Solo SECRETARIA puede asignar materias.",
+                    StandardCharsets.UTF_8.toString()
+                );
+                res.redirect("/dashboard?error=" + errorMessage);
+                return "";
+            }
+
+            String teacherIdParam = req.queryParams("teacher_id");
+            String materiaIdParam = req.queryParams("materia_id");
+
+            if (
+                teacherIdParam == null ||
+                teacherIdParam.isEmpty() ||
+                materiaIdParam == null ||
+                materiaIdParam.isEmpty()
+            ) {
+                String errorMessage = URLEncoder.encode(
+                    "Debes seleccionar un docente y una materia.",
+                    StandardCharsets.UTF_8.toString()
+                );
+                res.redirect("/teacher/assign-materia?error=" + errorMessage);
+                return "";
+            }
+
+            try {
+                int teacherId = Integer.parseInt(teacherIdParam);
+                int materiaId = Integer.parseInt(materiaIdParam);
+
+                Teacher teacher = (Teacher) Teacher.findFirst("usuario_id = ?", teacherId);
+                Materia materia = (Materia) Materia.findFirst("codigo = ?", materiaId);
+
+                if (teacher == null || materia == null) {
+                    String errorMessage = URLEncoder.encode(
+                        "Docente o materia no válida.",
+                        StandardCharsets.UTF_8.toString()
+                    );
+                    res.redirect("/teacher/assign-materia?error=" + errorMessage);
+                    return "";
+                }
+
+                DocenteMateria existing = DocenteMateria.findFirst(
+                    "teacher_id = ? AND materia_id = ?",
+                    teacherId,
+                    materiaId
+                );
+
+                if (existing != null) {
+                    String errorMessage = URLEncoder.encode(
+                        "Esta asignación ya existe.",
+                        StandardCharsets.UTF_8.toString()
+                    );
+                    res.redirect("/teacher/assign-materia?error=" + errorMessage);
+                    return "";
+                }
+
+                DocenteMateria nuevo = new DocenteMateria();
+                nuevo.set("teacher_id", teacherId, "materia_id", materiaId);
+                nuevo.saveIt();
+
+                String successMessage = URLEncoder.encode(
+                    "Materia asignada correctamente al docente.",
+                    StandardCharsets.UTF_8.toString()
+                );
+                res.redirect("/teacher/assign-materia?message=" + successMessage);
+                return "";
+            } catch (NumberFormatException e) {
+                String errorMessage = URLEncoder.encode(
+                    "Los identificadores de docente y materia deben ser numéricos.",
+                    StandardCharsets.UTF_8.toString()
+                );
+                res.redirect("/teacher/assign-materia?error=" + errorMessage);
+                return "";
+            } catch (Exception e) {
+                e.printStackTrace();
+                String errorMessage = URLEncoder.encode(
+                    "Error interno al asignar la materia. Intente de nuevo.",
+                    StandardCharsets.UTF_8.toString()
+                );
+                res.redirect("/teacher/assign-materia?error=" + errorMessage);
                 return "";
             }
         });

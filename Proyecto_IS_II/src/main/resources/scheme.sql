@@ -2,6 +2,7 @@ DROP TABLE IF EXISTS sesion;
 DROP TABLE IF EXISTS gestorSistema;
 DROP TABLE IF EXISTS secretariaAcademica;
 DROP TABLE IF EXISTS teacher;
+DROP TABLE IF EXISTS Docente_Materia;
 DROP TABLE IF EXISTS student;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS SolicitudAula;
@@ -104,6 +105,15 @@ CREATE TABLE Materia (
     anio_cursada INT NOT NULL,
     carga_horaria_total INT,
     CONSTRAINT fk_materia_plan FOREIGN KEY (plan_estudio_id) REFERENCES Plan_Estudio(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE Docente_Materia (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    teacher_id INT NOT NULL,
+    materia_id INT NOT NULL,
+    CONSTRAINT fk_docente_materia_teacher FOREIGN KEY (teacher_id) REFERENCES teacher(usuario_id) ON DELETE CASCADE,
+    CONSTRAINT fk_docente_materia_materia FOREIGN KEY (materia_id) REFERENCES Materia(codigo) ON DELETE CASCADE,
+    UNIQUE KEY unique_teacher_materia (teacher_id, materia_id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE Correlatividad (
