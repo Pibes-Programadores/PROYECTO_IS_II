@@ -5,6 +5,9 @@ import static spark.Spark.*; // Importa los métodos estáticos principales de S
 // Importaciones necesarias para la aplicación Spark
 import com.fasterxml.jackson.databind.ObjectMapper; // Utilidad para serializar/deserializar objetos Java a/desde JSON.
 // Importaciones de clases del proyecto
+import com.is1.proyecto.models.Anuncio;
+import com.is1.proyecto.models.Nota;
+import com.is1.proyecto.models.AulaAsignacion;
 import com.is1.proyecto.config.DBConfigSingleton; // Clase Singleton para la configuración de la base de datos.
 import com.is1.proyecto.models.SecretariaAcademica;
 import com.is1.proyecto.models.Student;
@@ -161,7 +164,7 @@ public class App {
             "/teacher/assign-materia",
             (req, res) -> {
                 String userRole = req.session().attribute("userRole");
-                if (userRole == null || !userRole.equals("SECRETARIA")) {
+                if (userRole == null || (!userRole.equals("SECRETARIA") && !userRole.equals("ADMIN"))) {
                     String errorMessage = URLEncoder.encode(
                         "Acceso denegado. Solo SECRETARIA puede asignar materias.",
                         StandardCharsets.UTF_8.toString()
@@ -900,7 +903,7 @@ public class App {
 
         post("/teacher/assign-materia", (req, res) -> {
             String userRole = req.session().attribute("userRole");
-            if (userRole == null || !userRole.equals("SECRETARIA")) {
+            if (userRole == null || (!userRole.equals("SECRETARIA") && !userRole.equals("ADMIN"))) {
                 String errorMessage = URLEncoder.encode(
                     "Acceso denegado. Solo SECRETARIA puede asignar materias.",
                     StandardCharsets.UTF_8.toString()
@@ -984,6 +987,319 @@ public class App {
                 return "";
             }
         });
+
+        // ==========================================
+// PANEL DEL DOCENTE — IS-19
+// ==========================================
+
+// Helper de autorización reutilizable
+// (definido como lambda local al inicio de main, antes del primer get/post)
+
+// GET /docente/materias — lista las materias asignadas al docente logueado
+get("/docente/materias", (req, res) -> {
+    String userRole = req.session().attribute("userRole");
+    if (userRole == null || !userRole.equals("DOCENTE")) {
+        res.redirect("/dashboard?error=" + URLEncoder.encode(
+            "Acceso denegado. Solo docentes pueden acceder a esta sección.",
+            StandardCharsets.UTF_8.toString()));
+        return null;
+    }
+
+    Map<String, Object> model = new HashMap<>();
+
+    String successMessage = req.queryParams("message");
+    String errorMessage   = req.queryParams("error");
+    if (successMessage != null && !successMessage.isEmpty()) model.put("successMessage", successMessage);
+    if (errorMessage   != null && !errorMessage.isEmpty())   model.put("errorMessage",   errorMessage);
+
+    // Obtenemos el Teacher a partir del userId guardado en sesión
+    Integer userId = req.session().attribute("userId");
+    Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
+
+    if (teacher == null) {
+        res.redirect("/dashboard?error=" + URLEncoder.encode(
+            "No se encontró un perfil docente para tu usuario.",
+            StandardCharsets.UTF_8.toString()));
+        return null;
+    }
+
+    int teacherId = teacher.getInteger("usuario_id");
+
+    // Buscamos las materias asignadas vía Docente_Materia
+    List<Map> materiasRaw = Base.findAll(
+        "SELECT m.codigo, m.nombre, m.anio_cursada " +
+        "FROM Materia m " +
+        "JOIN Docente_Materia dm ON m.codigo = dm.materia_id " +
+        "WHERE dm.teacher_id = ? " +
+        "ORDER BY m.anio_cursada ASC, m.nombre ASC",
+        teacherId
+    );
+
+    model.put("materias",    materiasRaw);
+    model.put("sinMaterias", materiasRaw.isEmpty());
+
+    return new ModelAndView(model, "docente_materias.mustache");
+}, new MustacheTemplateEngine());
+
+
+// GET /docente/materia/:materiaId — panel de acciones de una materia concreta
+get("/docente/materia/:materiaId", (req, res) -> {
+    String userRole = req.session().attribute("userRole");
+    if (userRole == null || !userRole.equals("DOCENTE")) {
+        res.redirect("/dashboard?error=" + URLEncoder.encode(
+            "Acceso denegado.", StandardCharsets.UTF_8.toString()));
+        return null;
+    }
+
+    Integer userId  = req.session().attribute("userId");
+    Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
+    if (teacher == null) { res.redirect("/dashboard"); return null; }
+
+    int teacherId  = teacher.getInteger("usuario_id");
+    int materiaId;
+    try {
+        materiaId = Integer.parseInt(req.params("materiaId"));
+    } catch (NumberFormatException e) {
+        res.redirect("/docente/materias?error=" + URLEncoder.encode(
+            "Materia inválida.", StandardCharsets.UTF_8.toString()));
+        return null;
+    }
+
+    // Verificamos que la materia le pertenezca al docente
+    DocenteMateria asignacion = DocenteMateria.findFirst(
+        "teacher_id = ? AND materia_id = ?", teacherId, materiaId);
+    if (asignacion == null) {
+        res.redirect("/docente/materias?error=" + URLEncoder.encode(
+            "No tenés acceso a esa materia.", StandardCharsets.UTF_8.toString()));
+        return null;
+    }
+
+    Materia materia = Materia.findFirst("codigo = ?", materiaId);
+    if (materia == null) { res.redirect("/docente/materias"); return null; }
+
+    // Periodo vigente de la materia
+    MateriaPeriodo periodo = MateriaPeriodo.findFirst("materia_codigo = ?", materiaId);
+    String periodoLabel = "";
+    if (periodo != null) {
+        String raw = periodo.getString("tipo_cuatrimestre");
+        if      ("PRIMER_CUATRIMESTRE".equals(raw))  periodoLabel = "I Cuatrimestre";
+        else if ("SEGUNDO_CUATRIMESTRE".equals(raw))  periodoLabel = "II Cuatrimestre";
+        else if ("ANUAL".equals(raw))                 periodoLabel = "Anual";
+        else if ("VERANO".equals(raw))                periodoLabel = "Verano";
+    }
+
+    // Alumnos para el selector de notas (todos los students)
+    List<Map<String, Object>> alumnosOptions = new ArrayList<>();
+    for (Model studentRecord : Student.findAll()) {
+        Student student = (Student) studentRecord;
+        User   user     = student.getUser();
+        String label    = user != null
+            ? user.getString("apellido") + ", " + user.getString("nombre") +
+              " — " + student.getLegajo()
+            : "Alumno #" + student.getInteger("usuario_id");
+        Map<String, Object> opt = new HashMap<>();
+        opt.put("id",    student.getInteger("usuario_id"));
+        opt.put("label", label);
+        alumnosOptions.add(opt);
+    }
+
+    Map<String, Object> model = new HashMap<>();
+    model.put("codigoMateria", materiaId);
+    model.put("nombreMateria", materia.getString("nombre"));
+    model.put("anioMateria",   materia.getInteger("anio_cursada"));
+    model.put("periodoMateria", periodoLabel);
+    model.put("alumnos",       alumnosOptions);
+
+    String successMessage = req.queryParams("message");
+    String errorMessage   = req.queryParams("error");
+    if (successMessage != null && !successMessage.isEmpty()) model.put("successMessage", successMessage);
+    if (errorMessage   != null && !errorMessage.isEmpty())   model.put("errorMessage",   errorMessage);
+
+    return new ModelAndView(model, "docente_panel_materia.mustache");
+}, new MustacheTemplateEngine());
+
+
+// POST /docente/materia/:materiaId/anuncio — persiste un anuncio
+post("/docente/materia/:materiaId/anuncio", (req, res) -> {
+    String userRole = req.session().attribute("userRole");
+    if (userRole == null || !userRole.equals("DOCENTE")) {
+        res.redirect("/dashboard?error=" + URLEncoder.encode(
+            "Acceso denegado.", StandardCharsets.UTF_8.toString()));
+        return "";
+    }
+
+    Integer userId  = req.session().attribute("userId");
+    Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
+    int teacherId   = teacher.getInteger("usuario_id");
+    int materiaId   = Integer.parseInt(req.params("materiaId"));
+
+    // Verificar pertenencia
+    if (DocenteMateria.findFirst("teacher_id = ? AND materia_id = ?", teacherId, materiaId) == null) {
+        res.redirect("/docente/materias?error=" + URLEncoder.encode(
+            "No tenés acceso a esa materia.", StandardCharsets.UTF_8.toString()));
+        return "";
+    }
+
+    // Obtener el MateriaPeriodo vigente
+    MateriaPeriodo mp = MateriaPeriodo.findFirst("materia_codigo = ?", materiaId);
+    if (mp == null) {
+        res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
+            "No existe un período activo para esta materia.", StandardCharsets.UTF_8.toString()));
+        return "";
+    }
+
+    String tipo        = req.queryParams("tipo");
+    String titulo      = req.queryParams("titulo");
+    String contenido   = req.queryParams("contenido");
+    String fechaExamen = req.queryParams("fecha_examen");
+
+    try {
+        Anuncio anuncio = new Anuncio();
+        anuncio.set("materia_periodo_id", mp.getId());
+        anuncio.set("teacher_id",         teacherId);
+        anuncio.set("tipo",               tipo);
+        anuncio.set("titulo",             titulo);
+        anuncio.set("contenido",          contenido);
+        if ("EXAMEN".equals(tipo) && fechaExamen != null && !fechaExamen.isBlank()) {
+            anuncio.set("fecha_examen", java.sql.Date.valueOf(fechaExamen));
+        }
+        anuncio.saveIt();
+
+        res.redirect("/docente/materia/" + materiaId + "?message=" + URLEncoder.encode(
+            "Anuncio publicado correctamente.", StandardCharsets.UTF_8.toString()));
+    } catch (Exception e) {
+        e.printStackTrace();
+        res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
+            "Error al publicar el anuncio: " + e.getMessage(), StandardCharsets.UTF_8.toString()));
+    }
+    return "";
+});
+
+
+// POST /docente/materia/:materiaId/nota — persiste una nota
+post("/docente/materia/:materiaId/nota", (req, res) -> {
+    String userRole = req.session().attribute("userRole");
+    if (userRole == null || !userRole.equals("DOCENTE")) {
+        res.redirect("/dashboard?error=" + URLEncoder.encode(
+            "Acceso denegado.", StandardCharsets.UTF_8.toString()));
+        return "";
+    }
+
+    Integer userId  = req.session().attribute("userId");
+    Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
+    int teacherId   = teacher.getInteger("usuario_id");
+    int materiaId   = Integer.parseInt(req.params("materiaId"));
+
+    if (DocenteMateria.findFirst("teacher_id = ? AND materia_id = ?", teacherId, materiaId) == null) {
+        res.redirect("/docente/materias?error=" + URLEncoder.encode(
+            "No tenés acceso a esa materia.", StandardCharsets.UTF_8.toString()));
+        return "";
+    }
+
+    MateriaPeriodo mp = MateriaPeriodo.findFirst("materia_codigo = ?", materiaId);
+    if (mp == null) {
+        res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
+            "No existe un período activo para esta materia.", StandardCharsets.UTF_8.toString()));
+        return "";
+    }
+
+    String studentIdParam = req.queryParams("student_id");
+    String valorParam     = req.queryParams("valor");
+
+    if (studentIdParam == null || studentIdParam.isEmpty() || valorParam == null || valorParam.isEmpty()) {
+        res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
+            "Debés seleccionar un alumno e ingresar una nota.", StandardCharsets.UTF_8.toString()));
+        return "";
+    }
+
+    try {
+        int    studentId = Integer.parseInt(studentIdParam);
+        double valor     = Double.parseDouble(valorParam);
+
+        if (valor < 0 || valor > 10) throw new IllegalArgumentException("La nota debe estar entre 0 y 10.");
+
+        Nota nota = new Nota();
+        nota.set("materia_periodo_id", mp.getId());
+        nota.set("student_id",         studentId);
+        nota.set("teacher_id",         teacherId);
+        nota.set("valor",              valor);
+        nota.saveIt();
+
+        res.redirect("/docente/materia/" + materiaId + "?message=" + URLEncoder.encode(
+            "Nota registrada correctamente.", StandardCharsets.UTF_8.toString()));
+    } catch (Exception e) {
+        e.printStackTrace();
+        res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
+            "Error al registrar la nota: " + e.getMessage(), StandardCharsets.UTF_8.toString()));
+    }
+    return "";
+});
+
+
+// POST /docente/materia/:materiaId/aula — persiste asignación de aula
+post("/docente/materia/:materiaId/aula", (req, res) -> {
+    String userRole = req.session().attribute("userRole");
+    if (userRole == null || !userRole.equals("DOCENTE")) {
+        res.redirect("/dashboard?error=" + URLEncoder.encode(
+            "Acceso denegado.", StandardCharsets.UTF_8.toString()));
+        return "";
+    }
+
+    Integer userId  = req.session().attribute("userId");
+    Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
+    int teacherId   = teacher.getInteger("usuario_id");
+    int materiaId   = Integer.parseInt(req.params("materiaId"));
+
+    if (DocenteMateria.findFirst("teacher_id = ? AND materia_id = ?", teacherId, materiaId) == null) {
+        res.redirect("/docente/materias?error=" + URLEncoder.encode(
+            "No tenés acceso a esa materia.", StandardCharsets.UTF_8.toString()));
+        return "";
+    }
+
+    MateriaPeriodo mp = MateriaPeriodo.findFirst("materia_codigo = ?", materiaId);
+    if (mp == null) {
+        res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
+            "No existe un período activo para esta materia.", StandardCharsets.UTF_8.toString()));
+        return "";
+    }
+
+    String aula = req.queryParams("aula");
+    if (aula == null || aula.isBlank()) {
+        res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
+            "Debés ingresar el nombre o número del aula.", StandardCharsets.UTF_8.toString()));
+        return "";
+    }
+
+    try {
+        AulaAsignacion asig = new AulaAsignacion();
+        asig.set("materia_periodo_id", mp.getId());
+        asig.set("teacher_id",         teacherId);
+        asig.set("aula",               aula);
+        asig.saveIt();
+
+        res.redirect("/docente/materia/" + materiaId + "?message=" + URLEncoder.encode(
+            "Aula asignada correctamente.", StandardCharsets.UTF_8.toString()));
+    } catch (Exception e) {
+        e.printStackTrace();
+        res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
+            "Error al asignar el aula: " + e.getMessage(), StandardCharsets.UTF_8.toString()));
+    }
+    return "";
+});
+
+
+// GET /docente/materia/:materiaId/contenido — stub "Próximamente"
+get("/docente/materia/:materiaId/contenido", (req, res) -> {
+    String userRole = req.session().attribute("userRole");
+    if (userRole == null || !userRole.equals("DOCENTE")) {
+        res.redirect("/dashboard?error=" + URLEncoder.encode(
+            "Acceso denegado.", StandardCharsets.UTF_8.toString()));
+        return null;
+    }
+    return new ModelAndView(new HashMap<>(), "contenido_proximamente.mustache");
+}, new MustacheTemplateEngine());
+
+
 
         // POST: Maneja el envío del formulario de inicio de sesión.
         post(

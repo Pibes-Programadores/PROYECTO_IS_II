@@ -7,6 +7,9 @@ DROP TABLE IF EXISTS student;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS SolicitudAula;
 DROP TABLE IF EXISTS Aula;
+DROP TABLE IF EXISTS Aula_Asignacion;
+DROP TABLE IF EXISTS Nota;
+DROP TABLE IF EXISTS Anuncio;
 DROP TABLE IF EXISTS Materia_Periodo;
 DROP TABLE IF EXISTS Correlatividad;
 DROP TABLE IF EXISTS Materia;
@@ -153,6 +156,47 @@ CREATE TABLE SolicitudAula (
     CONSTRAINT fk_solicitud_aula FOREIGN KEY (aula_id) REFERENCES Aula(id) ON DELETE CASCADE,
     CONSTRAINT fk_solicitud_materia FOREIGN KEY (materia_periodo_id) REFERENCES Materia_Periodo(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
+-- Tabla Anuncio
+CREATE TABLE Anuncio (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    materia_periodo_id INT NOT NULL,
+    teacher_id INT NOT NULL,
+    tipo ENUM('GENERAL', 'EXAMEN') NOT NULL,
+    titulo VARCHAR(255) NOT NULL,
+    contenido TEXT NOT NULL,
+    fecha_examen DATE NULL,
+    fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (materia_periodo_id) REFERENCES Materia_Periodo(id) ON DELETE CASCADE,
+    FOREIGN KEY (teacher_id) REFERENCES teacher(usuario_id) ON DELETE CASCADE
+)ENGINE=InnoDB;
+
+-- Tabla Nota
+CREATE TABLE Nota (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    materia_periodo_id INT NOT NULL,
+    student_id INT NOT NULL,
+    teacher_id INT NOT NULL,
+    valor DECIMAL(5,2) NOT NULL,
+    fecha_carga DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (materia_periodo_id) REFERENCES Materia_Periodo(id) ON DELETE CASCADE,
+    FOREIGN KEY (student_id) REFERENCES student(usuario_id) ON DELETE CASCADE,
+    FOREIGN KEY (teacher_id) REFERENCES teacher(usuario_id) ON DELETE CASCADE
+)ENGINE=InnoDB;
+
+-- Tabla Aula_Asignacion
+CREATE TABLE Aula_Asignacion (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    materia_periodo_id INT NOT NULL,
+    teacher_id INT NOT NULL,
+    aula VARCHAR(50) NOT NULL,
+    fecha_asignacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (materia_periodo_id) REFERENCES Materia_Periodo(id) ON DELETE CASCADE,
+    FOREIGN KEY (teacher_id) REFERENCES teacher(usuario_id) ON DELETE CASCADE
+)ENGINE=InnoDB;
+
+
+
 
 -- SCRIPT DE INICIALIZACIÓN (SEED)
 -- Creamos el superusuario por defecto para todo el equipo
