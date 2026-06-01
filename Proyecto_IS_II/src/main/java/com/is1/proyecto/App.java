@@ -28,6 +28,8 @@ import java.nio.charset.StandardCharsets;
 // Importaciones estándar de Java
 import java.util.HashMap; // Para crear mapas de datos (modelos para las plantillas).
 import java.util.Map; // Interfaz Map, utilizada para Map.of() o HashMap.
+
+import com.mysql.cj.exceptions.StreamingNotifiable;
 import org.javalite.activejdbc.Base; // Clase central de ActiveJDBC para gestionar la conexión a la base de datos.
 import org.javalite.activejdbc.Model;
 import org.mindrot.jbcrypt.BCrypt; // Utilidad para hashear y verificar contraseñas de forma segura.
@@ -161,70 +163,170 @@ public class App {
         );
 
         get(
-            "/teacher/assign-materia",
-            (req, res) -> {
-                String userRole = req.session().attribute("userRole");
-                if (userRole == null || (!userRole.equals("SECRETARIA") && !userRole.equals("ADMIN"))) {
-                    String errorMessage = URLEncoder.encode(
-                        "Acceso denegado. Solo SECRETARIA puede asignar materias.",
-                        StandardCharsets.UTF_8.toString()
-                    );
-                    res.redirect("/dashboard?error=" + errorMessage);
-                    return null;
-                }
-
-                Map<String, Object> model = new HashMap<>();
-                String successMessage = req.queryParams("message");
-                String errorMessage = req.queryParams("error");
-                if (successMessage != null && !successMessage.isEmpty()) {
-                    model.put("successMessage", successMessage);
-                }
-                if (errorMessage != null && !errorMessage.isEmpty()) {
-                    model.put("errorMessage", errorMessage);
-                }
-
-                List<Map<String, Object>> teacherOptions = new ArrayList<>();
-                for (Model teacherRecord : Teacher.findAll()) {
-                    Teacher teacher = (Teacher) teacherRecord;
-                    User user = teacher.getUser();
-                    String label = "";
-                    Integer teacherId = teacher.getInteger("usuario_id");
-                    if (user != null) {
-                        label =
-                            user.getString("apellido") + ", " +
-                            user.getString("nombre") +
-                            " — " +
-                            teacher.getLegajoDocente();
-                    } else {
-                        label = "Docente #" + teacherId;
+                "/teacher/assign-materia",
+                (req, res) -> {
+                    String userRole = req.session().attribute("userRole");
+                    if (userRole == null || (!userRole.equals("SECRETARIA") && !userRole.equals("ADMIN"))) {
+                        String errorMessage = URLEncoder.encode(
+                                "Acceso denegado. Solo SECRETARIA puede asignar materias.",
+                                StandardCharsets.UTF_8.toString()
+                        );
+                        res.redirect("/dashboard?error=" + errorMessage);
+                        return null;
                     }
-                    Map<String, Object> option = new HashMap<>();
-                    option.put("id", teacherId);
-                    option.put("label", label);
-                    teacherOptions.add(option);
-                }
 
-                List<Map<String, Object>> materiaOptions = new ArrayList<>();
-                for (Model materiaRecord : Materia.findAll()) {
-                    Materia materia = (Materia) materiaRecord;
-                    Map<String, Object> option = new HashMap<>();
-                    option.put("id", materia.getInteger("codigo"));
-                    option.put(
-                        "label",
-                        materia.getInteger("codigo") +
-                        " - " +
-                        materia.getString("nombre")
+                    Map<String, Object> model = new HashMap<>();
+
+                    String successMessage = req.queryParams("message");
+                    String errorMessage   = req.queryParams("error");
+                    if (successMessage != null && !successMessage.isEmpty()) {
+                        model.put("successMessage", successMessage);
+                    }
+                    if (errorMessage != null && !errorMessage.isEmpty()) {
+                        model.put("errorMessage", errorMessage);
+                    }
+
+                    // Solo enviamos los Planes de Estudio vigentes.
+                    List<Map> planesVigentes = Base.findAll(
+                            "SELECT p.id AS id, c.id AS carrera_id, " +
+                                    "CONCAT(c.nombre, ' — Plan ', p.anio_resolucion) AS descripcion " +
+                                    "FROM Plan_Estudio p " +
+                                    "JOIN Carrera c ON p.carrera_id = c.id " +
+                                    "WHERE p.estado = 'VIGENTE' " +
+                                    "ORDER BY c.nombre ASC, p.anio_resolucion DESC"
                     );
-                    materiaOptions.add(option);
+
+                    // ya no docentes ni materias.
+                    model.put("planes", planesVigentes);
+
+                    return new ModelAndView(model, "assign_materia_form.mustache");
+                },
+                new MustacheTemplateEngine()
+        );
+
+        // GET /api/materias-por-plan?plan_id=X
+        // Devuelve en JSON las materias pertenecientes al plan indicado.
+        get("/api/materias-por-plan", (req, res) -> {
+            res.type("application/json");
+
+            String planIdParam = req.queryParams("plan_id");
+            if (planIdParam == null || planIdParam.isBlank()) {
+                res.status(400);
+                return objectMapper.writeValueAsString(
+                        Map.of("error", "Se requiere el parámetro plan_id.")
+                );
+            }
+
+            try {
+                int planId = Integer.parseInt(planIdParam.trim());
+
+                List<Map> materias = Base.findAll(
+                        "SELECT codigo AS id, nombre " +
+                                "FROM Materia " +
+                                "WHERE plan_estudio_id = ? " +
+                                "ORDER BY anio_cursada ASC, nombre ASC",
+                        planId
+                );
+
+                // Convertimos a List<Map<String,Object>> para serialización limpia con Jackson
+                List<Map<String, Object>> resultado = new ArrayList<>();
+                for (Map m : materias) {
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("id",     m.get("id"));
+                    item.put("nombre", m.get("nombre"));
+                    resultado.add(item);
                 }
 
-                model.put("teachers", teacherOptions);
-                model.put("materias", materiaOptions);
+                return objectMapper.writeValueAsString(resultado);
 
-                return new ModelAndView(model, "assign_materia_form.mustache");
-            },
-            new MustacheTemplateEngine()
-        );
+            } catch (NumberFormatException e) {
+                res.status(400);
+                return objectMapper.writeValueAsString(
+                        Map.of("error", "plan_id debe ser un número entero.")
+                );
+            } catch (Exception e) {
+                e.printStackTrace();
+                res.status(500);
+                return objectMapper.writeValueAsString(
+                        Map.of("error", "Error interno al obtener materias.")
+                );
+            }
+        });
+
+        // GET /api/docentes-search?carrera_id=X&query=Y
+        // Busca docentes asociados a la carrera indicada cuyo nombre, apellido
+        // o legajo contengan la cadena `query`. Devuelve JSON.
+        get("/api/docentes-search", (req, res) -> {
+            res.type("application/json");
+
+            String carreraIdParam = req.queryParams("carrera_id");
+            String query          = req.queryParams("query");
+
+            if (carreraIdParam == null || carreraIdParam.isBlank()) {
+                res.status(400);
+                return objectMapper.writeValueAsString(
+                        Map.of("error", "Se requiere el parámetro carrera_id.")
+                );
+            }
+            if (query == null) query = "";
+            String like = "%" + query.trim() + "%";
+
+            try {
+                int carreraId = Integer.parseInt(carreraIdParam.trim());
+
+                // Buscamos docentes vinculados a la carrera cuyo nombre, apellido
+                // o legajo coincidan con el término de búsqueda (LIKE, case-insensitive).
+                List<Map> rows = Base.findAll(
+                        "SELECT t.usuario_id AS id, " +
+                                "       t.legajo_docente AS legajo, " +
+                                "       u.nombre, " +
+                                "       u.apellido " +
+                                "FROM teacher t " +
+                                "JOIN users u           ON u.id = t.usuario_id " +
+                                "JOIN Docente_Carrera dc ON dc.teacher_id = t.usuario_id " +
+                                "WHERE dc.carrera_id = ? " +
+                                "  AND (u.nombre LIKE ? OR u.apellido LIKE ? OR t.legajo_docente LIKE ?) " +
+                                "ORDER BY u.apellido ASC, u.nombre ASC " +
+                                "LIMIT 20",
+                        carreraId, like, like, like
+                );
+
+                List<Map<String, Object>> resultado = new ArrayList<>();
+                for (Map row : rows) {
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("id",     row.get("id"));
+                    // Formato: LEGAJO - APELLIDO, Nombre
+                    String label = row.get("legajo") + " — " +
+                            row.get("apellido") + ", " +
+                            row.get("nombre");
+                    item.put("label", label);
+                    resultado.add(item);
+                }
+
+                return objectMapper.writeValueAsString(resultado);
+
+            } catch (NumberFormatException e) {
+                res.status(400);
+                return objectMapper.writeValueAsString(
+                        Map.of("error", "carrera_id debe ser un número entero.")
+                );
+            } catch (Exception e) {
+                e.printStackTrace();
+                res.status(500);
+                return objectMapper.writeValueAsString(
+                        Map.of("error", "Error interno en la búsqueda de docentes.")
+                );
+            }
+        });
+
+
+
+
+
+
+
+
+
 
         // Importar el modelo Teacher al inicio del archivo si no está:
         // import com.is1.proyecto.models.Teacher;
