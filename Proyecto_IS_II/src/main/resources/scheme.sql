@@ -1,6 +1,7 @@
 DROP TABLE IF EXISTS sesion;
 DROP TABLE IF EXISTS gestorSistema;
 DROP TABLE IF EXISTS secretariaAcademica;
+DROP TABLE IF EXISTS Docente_Carrera;
 DROP TABLE IF EXISTS teacher;
 DROP TABLE IF EXISTS Docente_Materia;
 DROP TABLE IF EXISTS student;
@@ -136,6 +137,14 @@ CREATE TABLE Materia_Periodo (
     anio_academico INT NOT NULL,
     tipo_cuatrimestre ENUM('PRIMER_CUATRIMESTRE', 'SEGUNDO_CUATRIMESTRE', 'ANUAL', 'VERANO') NOT NULL,
     CONSTRAINT fk_periodo_materia FOREIGN KEY (materia_codigo) REFERENCES Materia(codigo) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE Docente_Carrera (
+	teacher_id INT NOT NULL,
+    materia_id INT NOT NULL,
+    PRIMARY KEY (teacher_id, materia_id),
+    CONSTRAINT fk_dc_teacher  FOREIGN KEY (teacher_id)  REFERENCES teacher(usuario_id)  ON DELETE CASCADE,
+    CONSTRAINT fk_dc_carrera  FOREIGN KEY (carrera_id)  REFERENCES Carrera(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE Aula (
