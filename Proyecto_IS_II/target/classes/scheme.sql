@@ -1,6 +1,7 @@
 DROP TABLE IF EXISTS sesion;
 DROP TABLE IF EXISTS gestorSistema;
 DROP TABLE IF EXISTS secretariaAcademica;
+DROP TABLE IF EXISTS Docente_Carrera;
 DROP TABLE IF EXISTS teacher;
 DROP TABLE IF EXISTS Docente_Materia;
 DROP TABLE IF EXISTS student;
@@ -16,9 +17,7 @@ DROP TABLE IF EXISTS Materia;
 DROP TABLE IF EXISTS Plan_Estudio;
 DROP TABLE IF EXISTS Carrera;
 
-
 -- Creación de la Tabla Base: Usuario
--- Usamos ENUM para Nivel_Acceso como pide el catálogo.
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     dni VARCHAR(20) NOT NULL UNIQUE,
@@ -32,9 +31,7 @@ CREATE TABLE users (
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
-
 -- Tabla Estudiante
--- Relación 1:1 con Usuario. El id del estudiante es el mismo id del usuario.
 CREATE TABLE student (
     usuario_id INT PRIMARY KEY,
     legajo VARCHAR(20) NOT NULL UNIQUE,
@@ -74,7 +71,6 @@ CREATE TABLE gestorSistema (
 ) ENGINE=InnoDB;
 
 -- Tabla Sesion
--- Implementa ON DELETE CASCADE para que si se borra el usuario, se borren sus sesiones.
 CREATE TABLE sesion (
     id INT AUTO_INCREMENT PRIMARY KEY,
     usuario_id INT NOT NULL,
@@ -123,8 +119,8 @@ CREATE TABLE Correlatividad (
     materia_codigo INT NOT NULL,
     materia_correlativa_codigo INT NOT NULL,
     condicion ENUM('REGULAR', 'APROBADA') NOT NULL DEFAULT 'APROBADA',
-    tipo_requisito ENUM('CURSAR', 'RENDIR') NOT NULL DEFAULT 'CURSAR', -- <- Columna agregada
-    PRIMARY KEY (materia_codigo, materia_correlativa_codigo, tipo_requisito), -- <- PK actualizada
+    tipo_requisito ENUM('CURSAR', 'RENDIR') NOT NULL DEFAULT 'CURSAR',
+    PRIMARY KEY (materia_codigo, materia_correlativa_codigo, tipo_requisito),
     CONSTRAINT fk_corr_materia FOREIGN KEY (materia_codigo) REFERENCES Materia(codigo) ON DELETE CASCADE,
     CONSTRAINT fk_corr_requisito FOREIGN KEY (materia_correlativa_codigo) REFERENCES Materia(codigo) ON DELETE CASCADE,
     CONSTRAINT chk_no_auto_correlativa CHECK (materia_codigo != materia_correlativa_codigo)
@@ -136,6 +132,14 @@ CREATE TABLE Materia_Periodo (
     anio_academico INT NOT NULL,
     tipo_cuatrimestre ENUM('PRIMER_CUATRIMESTRE', 'SEGUNDO_CUATRIMESTRE', 'ANUAL', 'VERANO') NOT NULL,
     CONSTRAINT fk_periodo_materia FOREIGN KEY (materia_codigo) REFERENCES Materia(codigo) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE Docente_Carrera (
+    teacher_id INT NOT NULL,
+    carrera_id INT NOT NULL,
+    PRIMARY KEY (teacher_id, carrera_id),
+    CONSTRAINT fk_dc_teacher  FOREIGN KEY (teacher_id)  REFERENCES teacher(usuario_id)  ON DELETE CASCADE,
+    CONSTRAINT fk_dc_carrera  FOREIGN KEY (carrera_id)  REFERENCES Carrera(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE Aula (
@@ -157,7 +161,6 @@ CREATE TABLE SolicitudAula (
     CONSTRAINT fk_solicitud_materia FOREIGN KEY (materia_periodo_id) REFERENCES Materia_Periodo(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- Tabla Anuncio
 CREATE TABLE Anuncio (
     id INT AUTO_INCREMENT PRIMARY KEY,
     materia_periodo_id INT NOT NULL,
@@ -171,7 +174,6 @@ CREATE TABLE Anuncio (
     FOREIGN KEY (teacher_id) REFERENCES teacher(usuario_id) ON DELETE CASCADE
 )ENGINE=InnoDB;
 
--- Tabla Nota
 CREATE TABLE Nota (
     id INT AUTO_INCREMENT PRIMARY KEY,
     materia_periodo_id INT NOT NULL,
@@ -184,7 +186,6 @@ CREATE TABLE Nota (
     FOREIGN KEY (teacher_id) REFERENCES teacher(usuario_id) ON DELETE CASCADE
 )ENGINE=InnoDB;
 
--- Tabla Aula_Asignacion
 CREATE TABLE Aula_Asignacion (
     id INT AUTO_INCREMENT PRIMARY KEY,
     materia_periodo_id INT NOT NULL,
@@ -195,17 +196,12 @@ CREATE TABLE Aula_Asignacion (
     FOREIGN KEY (teacher_id) REFERENCES teacher(usuario_id) ON DELETE CASCADE
 )ENGINE=InnoDB;
 
-
-
-
--- SCRIPT DE INICIALIZACIÓN (SEED)
--- Creamos el superusuario por defecto para todo el equipo
 INSERT IGNORE INTO users (dni, nombre, apellido, nombre_usuario, password, nivel_acceso) 
 VALUES (
     '00000000', 
     'Administrador', 
     'Sistema', 
     'admin', 
-    '$2a$10$tzGyrad6vMs9/BPymyxxv.JdZ8KEaDipWPuj1UqE1U6KuzRbDciy6', -- Esta es la clave 'admin' hasheada (reemplazala por el hash real que tengas en tu BD)
+    '$2a$10$tzGyrad6vMs9/BPymyxxv.JdZ8KEaDipWPuj1UqE1U6KuzRbDciy6',
     'ADMIN'
 );
