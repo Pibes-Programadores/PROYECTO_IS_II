@@ -17,6 +17,8 @@ import com.is1.proyecto.models.Materia;
 import com.is1.proyecto.models.MateriaPeriodo;
 import com.is1.proyecto.models.Correlatividad;
 import com.is1.proyecto.models.DocenteMateria;
+import com.is1.proyecto.models.MesaExamen;
+import com.is1.proyecto.models.InscripcionExamen;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -1526,6 +1528,159 @@ get("/docente/materia/:materiaId/contenido", (req, res) -> {
                     )
                 );
             }
+        });
+        // ======================================
+        // INSCRIPCION A MESA DE EXAMEN
+        //=======================================
+        // ISSUE: Listar mesas de examen disponibles para el estudiante
+        get("/estudiante/inscripcion/examen", (req, res) -> {
+            // Obtenemos el usuario logueado directo de la sesión de Spark
+            User alumno = req.session().attribute("usuario");
+            if (alumno == null || !"ESTUDIANTE".equals(alumno.getString("nivel_acceso"))) {
+                res.redirect("/login");
+                return null;
+            }
+
+            int alumnoId = alumno.getInteger("id");
+            List<Map<String, Object>> mesasHabilitadas = new ArrayList<>();
+
+            // 1. Obtener todas las mesas de examen registradas
+            List<MesaExamen> todasLasMesas = MesaExamen.findAll();
+
+            for (MesaExamen mesa : todasLasMesas) {
+                String materiaCodigo = mesa.getString("materia_codigo");
+
+                // 2. Consultar el Estado Académico del alumno para esta materia
+                List<Map> estadoRows = org.javalite.activejdbc.Base.findAll(
+                        "SELECT estado FROM estado_academico WHERE usuario_id = ? AND materia_codigo = ?",
+                        alumnoId, materiaCodigo
+                );
+
+                if (!estadoRows.isEmpty()) {
+                    String estado = (String) estadoRows.get(0).get("estado");
+
+                    // Condición de Negocio: Solo REGULAR o LIBRE
+                    if ("REGULAR".equals(estado) || "LIBRE".equals(estado)) {
+
+                        // 3. Validar correlatividades de tipo 'RENDIR'
+                        List<Map> requisitos = org.javalite.activejdbc.Base.findAll(
+                                "SELECT materia_requerida_codigo FROM Correlatividad WHERE materia_codigo = ? AND tipo_requisito = 'RENDIR'",
+                                materiaCodigo
+                        );
+
+                        boolean cumpleCorrelatividades = true;
+                        for (Map reqItem : requisitos) {
+                            String reqCodigo = (String) reqItem.get("materia_requerida_codigo");
+
+                            List<Map> estadoReqRows = org.javalite.activejdbc.Base.findAll(
+                                    "SELECT estado FROM estado_academico WHERE usuario_id = ? AND materia_codigo = ?",
+                                    alumnoId, reqCodigo
+                            );
+
+                            if (estadoReqRows.isEmpty() || !"APROBADO".equals(estadoReqRows.get(0).get("estado"))) {
+                                cumpleCorrelatividades = false;
+                                break;
+                            }
+                        }
+
+                        // Si pasó el filtro de estados y correlatividades, la mesa está disponible
+                        if (cumpleCorrelatividades) {
+                            Map<String, Object> mesaData = new HashMap<>();
+                            mesaData.put("id", mesa.get("id"));
+                            mesaData.put("materia_codigo", materiaCodigo);
+                            mesaData.put("fecha", mesa.get("fecha"));
+                            mesasHabilitadas.add(mesaData);
+                        }
+                    }
+                }
+            }
+
+            Map<String, Object> viewData = new HashMap<>();
+            viewData.put("mesas", mesasHabilitadas);
+
+            // Usamos el renderizador de Spark con Mustache directo para evitar buscar el método personalizado
+            return new spark.template.mustache.MustacheTemplateEngine().render(
+                    new spark.ModelAndView(viewData, "inscripcion_examenes.mustache")
+            );
+        });
+
+        // ISSUE: Procesar la inscripción del estudiante a la mesa de examen seleccionada
+        post("/estudiante/inscripcion/examen", (req, res) -> {
+            User alumno = req.session().attribute("usuario");
+            if (alumno == null || !"ESTUDIANTE".equals(alumno.getString("nivel_acceso"))) {
+                res.status(403);
+                return "No autorizado";
+            }
+
+            int alumnoId = alumno.getInteger("id");
+            String mesaIdStr = req.queryParams("mesa_id");
+
+            if (mesaIdStr == null || mesaIdStr.isEmpty()) {
+                res.redirect("/estudiante/inscripcion/examen?error=Mesa no especificada");
+                return null;
+            }
+
+            int mesaId = Integer.parseInt(mesaIdStr);
+            MesaExamen mesa = MesaExamen.findById(mesaId);
+
+            // VALIDACIONES DE SEGURIDAD
+            if (mesa == null) {
+                res.redirect("/estudiante/inscripcion/examen?error=La mesa seleccionada no existe");
+                return null;
+            }
+
+            String materiaCodigo = mesa.getString("materia_codigo");
+
+            // 1. Re-verificar Estado Académico
+            List<Map> estadoRows = org.javalite.activejdbc.Base.findAll(
+                    "SELECT estado FROM estado_academico WHERE usuario_id = ? AND materia_codigo = ?",
+                    alumnoId, materiaCodigo
+            );
+
+            if (estadoRows.isEmpty()) {
+                res.redirect("/estudiante/inscripcion/examen?error=No posees estado academico en esta materia");
+                return null;
+            }
+
+            String estado = (String) estadoRows.get(0).get("estado");
+            if (!"REGULAR".equals(estado) && !"LIBRE".equals(estado)) {
+                res.redirect("/estudiante/inscripcion/examen?error=Tu condicion academica no te permite rendir esta materia");
+                return null;
+            }
+
+            // 2. Re-verificar Correlatividades de tipo 'RENDIR'
+            List<Map> requisitos = org.javalite.activejdbc.Base.findAll(
+                    "SELECT materia_requerida_codigo FROM Correlatividad WHERE materia_codigo = ? AND tipo_requisito = 'RENDIR'",
+                    materiaCodigo
+            );
+
+            for (Map reqItem : requisitos) {
+                String reqCodigo = (String) reqItem.get("materia_requerida_codigo");
+
+                List<Map> estadoReqRows = org.javalite.activejdbc.Base.findAll(
+                        "SELECT estado FROM estado_academico WHERE usuario_id = ? AND materia_codigo = ?",
+                        alumnoId, reqCodigo
+                );
+
+                if (estadoReqRows.isEmpty() || !"APROBADO".equals(estadoReqRows.get(0).get("estado"))) {
+                    res.redirect("/estudiante/inscripcion/examen?error=No cumples con las correlatividades requeridas para rendir");
+                    return null;
+                }
+            }
+
+            // 3. Persistir la inscripción en la base de datos
+            try {
+                InscripcionExamen inscripcion = new InscripcionExamen();
+                inscripcion.set("usuario_id", alumnoId);
+                inscripcion.set("mesa_id", mesaId);
+                inscripcion.saveIt();
+
+                res.redirect("/estudiante/inscripcion/examen?success=Te has inscripto a la mesa con exito");
+            } catch (Exception e) {
+                res.redirect("/estudiante/inscripcion/examen?error=Ya te encuentras inscripto en esta mesa de examen");
+            }
+
+            return null;
         });
     } 
 } 
