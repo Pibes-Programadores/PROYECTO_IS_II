@@ -25,6 +25,7 @@ import com.is1.proyecto.models.Teacher;
 import com.is1.proyecto.models.User; // Modelo de ActiveJDBC que representa la tabla 'users'.
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import com.is1.proyecto.models.DocenteCarrera;
 // Importaciones estándar de Java
 import java.util.HashMap; // Para crear mapas de datos (modelos para las plantillas).
 import java.util.Map; // Interfaz Map, utilizada para Map.of() o HashMap.
@@ -134,32 +135,28 @@ public class App {
         );
 
         // GET: Ruta para MOSTRAR el formulario de carga de docente
+        // modifiqué para que ande bien lo de asignar docentes
         get(
-            "/teacher/new",
-            (req, res) -> {
-                // Constructor de model
-                Map<String, Object> model = new HashMap<>();
+                "/teacher/new",
+                (req, res) -> {
+                    Map<String, Object> model = new HashMap<>();
 
-                // REVISAMOS SI HAY MENSAJES EN LA URL
-                // Si vienes redirigido de un éxito, la URL será: /teacher/new?message=...
-                String successMessage = req.queryParams("message");
+                    String successMessage = req.queryParams("message");
+                    String errorMessage = req.queryParams("error");
 
-                // Si vienes redirigido de un fallo, la URL será: /teacher/new?error=...
-                String errorMessage = req.queryParams("error");
+                    if (successMessage != null && !successMessage.isEmpty()) {
+                        model.put("successMessage", successMessage);
+                    }
+                    if (errorMessage != null && !errorMessage.isEmpty()) {
+                        model.put("errorMessage", errorMessage);
+                    }
 
-                // Si existen, los metemos en la cajita (modelo)
-                if (successMessage != null && !successMessage.isEmpty()) {
-                    model.put("successMessage", successMessage);
-                }
+                    List<Map> carreras = Base.findAll("SELECT id, nombre FROM Carrera ORDER BY nombre ASC");
+                    model.put("carreras", carreras);
 
-                if (errorMessage != null && !errorMessage.isEmpty()) {
-                    model.put("errorMessage", errorMessage);
-                }
-
-                // Renderizamos la vista.
-                return new ModelAndView(model, "teacher_from.mustache");
-            },
-            new MustacheTemplateEngine()
+                    return new ModelAndView(model, "teacher_from.mustache");
+                },
+                new MustacheTemplateEngine()
         );
 
         get(
@@ -952,11 +949,10 @@ public class App {
             String cuil = req.queryParams("teacher_cuil");
             String email = req.queryParams("teacher_email");
             String especialidad = req.queryParams("especialidad");
+            String carreraId = req.queryParams("carrera_id");
 
-            if (name == null || lastName == null || dni == null) {
-                res.redirect(
-                    "/teacher/new?error=Los campos Nombre, Apellido y DNI son obligatorios."
-                );
+            if (name == null || lastName == null || dni == null || carreraId == null || carreraId.isBlank()) {
+                res.redirect("/teacher/new?error=Los campos Nombre, Apellido, DNI y Carrera son obligatorios.");
                 return "";
             }
 
@@ -980,6 +976,11 @@ public class App {
                 t.set("legajo_docente", legajo, "cuil", cuil);
                 t.set("email", email, "especialidad", especialidad);
                 t.saveIt();
+
+                DocenteCarrera dc = new DocenteCarrera();
+                dc.set("teacher_id", u.getId());
+                dc.set("carrera_id", Integer.parseInt(carreraId));
+                dc.saveIt();
 
                 // Cuando la creacion es exitosa
                 String mensajeExito =
