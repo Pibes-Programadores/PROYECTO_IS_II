@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Plan de Estudios - Grilla Académica</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] min-h-screen p-6 flex flex-col items-center">
+    
+    <div class="w-full max-w-5xl bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-xl border border-purple-900/30">
+        <h1 class="text-3xl font-bold text-center text-white mb-6">Grilla de Plan de Estudios</h1>
+
+        <form action="/carrera/materias" method="get" class="bg-[#190019]/40 p-4 rounded-md flex gap-4 items-end mb-6">
+            <div class="flex-1">
+                <label for="plan_id" class="block text-[#ccd0fc] text-sm font-medium mb-1">Seleccione la Carrera / Plan:</label>
+                <select id="plan_id" name="plan_id" required class="w-full px-4 py-2 border rounded-md bg-white text-gray-900 focus:ring-2 focus:ring-purple-500">
+                    <option value="">-- Seleccionar Carrera --</option>
+                    {{#planes}}
+                    <option value="{{id}}">{{descripcion}}</option>
+                    {{/planes}}
+                </select>
+            </div>
+            <button type="submit" class="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700 font-medium transition duration-200">
+                Buscar Plan
+            </button>
+        </form>
+
+        {{#mostrarTabla}}
+        <div class="overflow-x-auto rounded-lg shadow border border-purple-950">
+            <table class="w-full text-sm text-left text-gray-100 bg-[#190019]/80">
+                <thead class="text-xs uppercase bg-purple-950 text-purple-200 border-b border-purple-900">
+                    <tr>
+                        <th scope="col" class="px-6 py-4 w-1/4">Año y Periodo</th>
+                        <th scope="col" class="px-6 py-4 w-1/6 text-center">Código</th>
+                        <th scope="col" class="px-6 py-4 w-1/3">Asignatura</th>
+                        <th scope="col" class="px-6 py-4 text-center text-green-300">Correlativas p/ Cursar<br><span class="text-[10px] text-gray-400">(Aprobadas)</span></th>
+                        <th scope="col" class="px-6 py-4 text-center text-yellow-300">Correlativas p/ Cursar<br><span class="text-[10px] text-gray-400">(Regulares)</span></th>
+                        <th scope="col" class="px-6 py-4 text-center text-blue-300">Para Rendir<br><span class="text-[10px] text-gray-400">(Aprobadas)</span></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-purple-900/40">
+                    {{#materias}}
+                    <tr class="hover:bg-purple-900/20 transition duration-150 border-b border-purple-900/20">
+                        <td class="px-6 py-4 font-medium text-purple-300">{{periodo_vista}}</td>
+                        <td class="px-6 py-4 text-center font-mono font-bold text-gray-300">{{codigo}}</td>
+                        <td class="px-6 py-4 font-semibold text-white">[{{codigo}}] - {{nombre}}</td>
+                        <td class="px-6 py-4 text-center font-mono text-green-300 font-semibold">{{correlativas_aprobadas}}</td>
+                        <td class="px-6 py-4 text-center font-mono text-yellow-300 font-semibold">{{correlativas_regulares}}</td>
+                        <td class="px-6 py-4 text-center font-mono text-blue-300 font-semibold">{{correlativas_rendir}}</td>
+                    </tr>
+                    {{/materias}}
+                </tbody>
+            </table>
+        </div>
+        {{/mostrarTabla}}
+
+        {{#sinMaterias}}
+        <div class="bg-amber-900/30 border border-amber-600/50 text-amber-200 p-4 rounded-md text-center">
+            ⚠️ Aún no hay asignaturas registradas para este plan de estudio específico.
+        </div>
+        {{/sinMaterias}}
+
+        <div class="text-center mt-6">
+            <a href="/dashboard" class="text-purple-300 hover:underline text-sm">Volver al Dashboard</a>
+        </div>
+    </div>
+
+</body>
+</html>
