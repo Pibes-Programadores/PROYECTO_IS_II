@@ -5,6 +5,9 @@ import static spark.Spark.*; // Importa los métodos estáticos principales de S
 // Importaciones necesarias para la aplicación Spark
 import com.fasterxml.jackson.databind.ObjectMapper; // Utilidad para serializar/deserializar objetos Java a/desde JSON.
 // Importaciones de clases del proyecto
+import com.is1.proyecto.models.Anuncio;
+import com.is1.proyecto.models.Nota;
+import com.is1.proyecto.models.AulaAsignacion;
 import com.is1.proyecto.config.DBConfigSingleton; // Clase Singleton para la configuración de la base de datos.
 import com.is1.proyecto.models.SecretariaAcademica;
 import com.is1.proyecto.models.Student;
@@ -13,6 +16,10 @@ import com.is1.proyecto.models.PlanEstudio;
 import com.is1.proyecto.models.Materia;
 import com.is1.proyecto.models.MateriaPeriodo;
 import com.is1.proyecto.models.Correlatividad;
+import com.is1.proyecto.models.DocenteMateria;
+import com.is1.proyecto.models.MesaExamen;
+import com.is1.proyecto.models.InscripcionExamen;
+import java.util.ArrayList;
 import java.util.List;
 
 // Importaciones específicas para ActiveJDBC (ORM para la base de datos)
@@ -20,10 +27,14 @@ import com.is1.proyecto.models.Teacher;
 import com.is1.proyecto.models.User; // Modelo de ActiveJDBC que representa la tabla 'users'.
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import com.is1.proyecto.models.DocenteCarrera;
 // Importaciones estándar de Java
 import java.util.HashMap; // Para crear mapas de datos (modelos para las plantillas).
 import java.util.Map; // Interfaz Map, utilizada para Map.of() o HashMap.
+
+import com.mysql.cj.exceptions.StreamingNotifiable;
 import org.javalite.activejdbc.Base; // Clase central de ActiveJDBC para gestionar la conexión a la base de datos.
+import org.javalite.activejdbc.Model;
 import org.mindrot.jbcrypt.BCrypt; // Utilidad para hashear y verificar contraseñas de forma segura.
 // Importaciones de Spark para renderizado de plantillas
 import spark.ModelAndView; // Representa un modelo de datos y el nombre de la vista a renderizar.
@@ -74,6 +85,69 @@ public class App {
             }
         });
 
+        get("/estudiante/inscripcion/examen", (req, res) -> {
+            // 1. Leemos la sesión real usando las variables del proyecto
+            String currentUsername = req.session().attribute("currentUserUsername");
+            String userRole = req.session().attribute("userRole");
+            Boolean loggedIn = req.session().attribute("loggedIn");
+
+            // VALIDACIÓN REAL: Si no está logueado o no es estudiante, rebota al login de una
+            if (currentUsername == null || loggedIn == null || !loggedIn || !"ESTUDIANTE".equals(userRole)) {
+                res.redirect("/?error=" + URLEncoder.encode("Debes iniciar sesión como estudiante para acceder.", StandardCharsets.UTF_8.toString()));
+                return null;
+            }
+
+            // 2. Buscamos el ID en la base de datos de forma limpia con el usuario de la sesión
+            User alumno = User.findFirst("nombre_usuario = ?", currentUsername);
+            if (alumno == null) {
+                res.redirect("/?error=" + URLEncoder.encode("Usuario no encontrado.", StandardCharsets.UTF_8.toString()));
+                return null;
+            }
+            int alumnoId = (int) alumno.getId();
+
+            List<Map<String, Object>> mesasHabilitadas = new ArrayList<>();
+
+            try {
+                // 3. Traemos todas las mesas de examen disponibles de la BD usando ActiveJDBC
+                List<MesaExamen> todasLasMesas = MesaExamen.findAll();
+
+                for (MesaExamen mesa : todasLasMesas) {
+                    Map<String, Object> datosMesa = new HashMap<>();
+                    datosMesa.put("id", mesa.getId());
+                    datosMesa.put("fecha", mesa.get("fecha"));
+
+                    // Buscamos el nombre de la materia vinculada a la mesa
+                    Materia materia = Materia.findById(mesa.get("materia_codigo"));
+                    if (materia != null) {
+                        datosMesa.put("materia_nombre", materia.get("nombre"));
+                    } else {
+                        datosMesa.put("materia_nombre", "Materia Desconocida");
+                    }
+
+                    // Chequeamos si el alumno ya se inscribió a esta mesa
+                    boolean yaInscripto = InscripcionExamen.findFirst(
+                            "usuario_id = ? AND mesa_id = ?",
+                            alumnoId,
+                            mesa.getId()
+                    ) != null;
+
+                    datosMesa.put("yaInscripto", yaInscripto);
+                    mesasHabilitadas.add(datosMesa);
+                }
+            } catch (Exception e) {
+                System.err.println("Error al procesar las mesas: " + e.getMessage());
+                e.printStackTrace();
+            }
+
+            // 4. Armamos el modelo de datos para Mustache
+            Map<String, Object> viewData = new HashMap<>();
+            viewData.put("mesas", mesasHabilitadas);
+            viewData.put("username", currentUsername);
+
+            // 5. Renderizamos tu plantilla mustache
+            return new ModelAndView(viewData, "inscripcion_examenes.mustache");
+        }, new MustacheTemplateEngine());
+
         // --- Rutas GET para renderizar formularios y páginas HTML ---
 
         // GET: Muestra el formulario de creación de cuenta.
@@ -81,6 +155,23 @@ public class App {
 
         // GET: Ruta para mostrar el dashboard (panel de control) del usuario.
         // Requiere que el usuario esté autenticado.
+        get(
+            "/login",
+            (req, res) -> {
+                Map<String, Object> model = new HashMap<>();
+                String errorMessage = req.queryParams("error");
+                String successMessage = req.queryParams("message");
+                if (errorMessage != null && !errorMessage.isEmpty()) {
+                    model.put("errorMessage", errorMessage);
+                }
+                if (successMessage != null && !successMessage.isEmpty()) {
+                    model.put("successMessage", successMessage);
+                }
+                return new ModelAndView(model, "login.mustache");
+            },
+            new MustacheTemplateEngine()
+        );
+
         get(
             "/dashboard",
             (req, res) -> {
@@ -104,12 +195,22 @@ public class App {
                 // 3. Pasamos los datos a la vista (Mustache)
                 model.put("username", currentUsername);
 
+                String errorMessage = req.queryParams("error");
+                if (errorMessage != null && !errorMessage.isEmpty()) {
+                    model.put("errorMessage", errorMessage);
+                }
+                String successMessage = req.queryParams("message");
+                if (successMessage != null && !successMessage.isEmpty()) {
+                    model.put("successMessage", successMessage);
+                }
+
                 // Creamos "banderas" (true/false) para que el HTML decida qué mostrar
                 model.put(
                     "isAdmin",
                     "ADMIN".equals(userRole) || "SECRETARIA".equals(userRole)
                 );
                 model.put("isDocente", "DOCENTE".equals(userRole));
+                model.put("isEstudiante", "ESTUDIANTE".equals(userRole));
 
                 return new ModelAndView(model, "dashboard.mustache");
             },
@@ -117,33 +218,195 @@ public class App {
         );
 
         // GET: Ruta para MOSTRAR el formulario de carga de docente
+        // modifiqué para que ande bien lo de asignar docentes
         get(
-            "/teacher/new",
-            (req, res) -> {
-                // Constructor de model
-                Map<String, Object> model = new HashMap<>();
+                "/teacher/new",
+                (req, res) -> {
+                    Map<String, Object> model = new HashMap<>();
 
-                // REVISAMOS SI HAY MENSAJES EN LA URL
-                // Si vienes redirigido de un éxito, la URL será: /teacher/new?message=...
-                String successMessage = req.queryParams("message");
+                    String successMessage = req.queryParams("message");
+                    String errorMessage = req.queryParams("error");
 
-                // Si vienes redirigido de un fallo, la URL será: /teacher/new?error=...
-                String errorMessage = req.queryParams("error");
+                    if (successMessage != null && !successMessage.isEmpty()) {
+                        model.put("successMessage", successMessage);
+                    }
+                    if (errorMessage != null && !errorMessage.isEmpty()) {
+                        model.put("errorMessage", errorMessage);
+                    }
 
-                // Si existen, los metemos en la cajita (modelo)
-                if (successMessage != null && !successMessage.isEmpty()) {
-                    model.put("successMessage", successMessage);
-                }
+                    List<Map> carreras = Base.findAll("SELECT id, nombre FROM Carrera ORDER BY nombre ASC");
+                    model.put("carreras", carreras);
 
-                if (errorMessage != null && !errorMessage.isEmpty()) {
-                    model.put("errorMessage", errorMessage);
-                }
-
-                // Renderizamos la vista.
-                return new ModelAndView(model, "teacher_from.mustache");
-            },
-            new MustacheTemplateEngine()
+                    return new ModelAndView(model, "teacher_from.mustache");
+                },
+                new MustacheTemplateEngine()
         );
+
+        get(
+                "/teacher/assign-materia",
+                (req, res) -> {
+                    String userRole = req.session().attribute("userRole");
+                    if (userRole == null || (!userRole.equals("SECRETARIA") && !userRole.equals("ADMIN"))) {
+                        String errorMessage = URLEncoder.encode(
+                                "Acceso denegado. Solo SECRETARIA puede asignar materias.",
+                                StandardCharsets.UTF_8.toString()
+                        );
+                        res.redirect("/dashboard?error=" + errorMessage);
+                        return null;
+                    }
+
+                    Map<String, Object> model = new HashMap<>();
+
+                    String successMessage = req.queryParams("message");
+                    String errorMessage   = req.queryParams("error");
+                    if (successMessage != null && !successMessage.isEmpty()) {
+                        model.put("successMessage", successMessage);
+                    }
+                    if (errorMessage != null && !errorMessage.isEmpty()) {
+                        model.put("errorMessage", errorMessage);
+                    }
+
+                    // Solo enviamos los Planes de Estudio vigentes.
+                    List<Map> planesVigentes = Base.findAll(
+                            "SELECT p.id AS id, c.id AS carrera_id, " +
+                                    "CONCAT(c.nombre, ' — Plan ', p.anio_resolucion) AS descripcion " +
+                                    "FROM Plan_Estudio p " +
+                                    "JOIN Carrera c ON p.carrera_id = c.id " +
+                                    "WHERE p.estado = 'VIGENTE' " +
+                                    "ORDER BY c.nombre ASC, p.anio_resolucion DESC"
+                    );
+
+                    // ya no docentes ni materias.
+                    model.put("planes", planesVigentes);
+
+                    return new ModelAndView(model, "assign_materia_form.mustache");
+                },
+                new MustacheTemplateEngine()
+        );
+
+        // GET /api/materias-por-plan?plan_id=X
+        // Devuelve en JSON las materias pertenecientes al plan indicado.
+        get("/api/materias-por-plan", (req, res) -> {
+            res.type("application/json");
+
+            String planIdParam = req.queryParams("plan_id");
+            if (planIdParam == null || planIdParam.isBlank()) {
+                res.status(400);
+                return objectMapper.writeValueAsString(
+                        Map.of("error", "Se requiere el parámetro plan_id.")
+                );
+            }
+
+            try {
+                int planId = Integer.parseInt(planIdParam.trim());
+
+                List<Map> materias = Base.findAll(
+                        "SELECT codigo AS id, nombre " +
+                                "FROM Materia " +
+                                "WHERE plan_estudio_id = ? " +
+                                "ORDER BY anio_cursada ASC, nombre ASC",
+                        planId
+                );
+
+                // Convertimos a List<Map<String,Object>> para serialización limpia con Jackson
+                List<Map<String, Object>> resultado = new ArrayList<>();
+                for (Map m : materias) {
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("id",     m.get("id"));
+                    item.put("nombre", m.get("nombre"));
+                    resultado.add(item);
+                }
+
+                return objectMapper.writeValueAsString(resultado);
+
+            } catch (NumberFormatException e) {
+                res.status(400);
+                return objectMapper.writeValueAsString(
+                        Map.of("error", "plan_id debe ser un número entero.")
+                );
+            } catch (Exception e) {
+                e.printStackTrace();
+                res.status(500);
+                return objectMapper.writeValueAsString(
+                        Map.of("error", "Error interno al obtener materias.")
+                );
+            }
+        });
+
+        // GET /api/docentes-search?carrera_id=X&query=Y
+        // Busca docentes asociados a la carrera indicada cuyo nombre, apellido
+        // o legajo contengan la cadena `query`. Devuelve JSON.
+        get("/api/docentes-search", (req, res) -> {
+            res.type("application/json");
+
+            String carreraIdParam = req.queryParams("carrera_id");
+            String query          = req.queryParams("query");
+
+            if (carreraIdParam == null || carreraIdParam.isBlank()) {
+                res.status(400);
+                return objectMapper.writeValueAsString(
+                        Map.of("error", "Se requiere el parámetro carrera_id.")
+                );
+            }
+            if (query == null) query = "";
+            String like = "%" + query.trim() + "%";
+
+            try {
+                int carreraId = Integer.parseInt(carreraIdParam.trim());
+
+                // Buscamos docentes vinculados a la carrera cuyo nombre, apellido
+                // o legajo coincidan con el término de búsqueda (LIKE, case-insensitive).
+                List<Map> rows = Base.findAll(
+                        "SELECT t.usuario_id AS id, " +
+                                "       t.legajo_docente AS legajo, " +
+                                "       u.nombre, " +
+                                "       u.apellido " +
+                                "FROM teacher t " +
+                                "JOIN users u           ON u.id = t.usuario_id " +
+                                "JOIN Docente_Carrera dc ON dc.teacher_id = t.usuario_id " +
+                                "WHERE dc.carrera_id = ? " +
+                                "  AND (u.nombre LIKE ? OR u.apellido LIKE ? OR t.legajo_docente LIKE ?) " +
+                                "ORDER BY u.apellido ASC, u.nombre ASC " +
+                                "LIMIT 20",
+                        carreraId, like, like, like
+                );
+
+                List<Map<String, Object>> resultado = new ArrayList<>();
+                for (Map row : rows) {
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("id",     row.get("id"));
+                    // Formato: LEGAJO - APELLIDO, Nombre
+                    String label = row.get("legajo") + " — " +
+                            row.get("apellido") + ", " +
+                            row.get("nombre");
+                    item.put("label", label);
+                    resultado.add(item);
+                }
+
+                return objectMapper.writeValueAsString(resultado);
+
+            } catch (NumberFormatException e) {
+                res.status(400);
+                return objectMapper.writeValueAsString(
+                        Map.of("error", "carrera_id debe ser un número entero.")
+                );
+            } catch (Exception e) {
+                e.printStackTrace();
+                res.status(500);
+                return objectMapper.writeValueAsString(
+                        Map.of("error", "Error interno en la búsqueda de docentes.")
+                );
+            }
+        });
+
+
+
+
+
+
+
+
+
 
         // Importar el modelo Teacher al inicio del archivo si no está:
         // import com.is1.proyecto.models.Teacher;
@@ -214,6 +477,16 @@ public class App {
                     errorMessage
                 );
 
+                List<Map> planesVigentes = Base.findAll(
+                    "SELECT p.id AS id, " +
+                    "CONCAT(c.nombre, ' (Plan Resol: ', p.anio_resolucion, ')') AS descripcion " +
+                    "FROM Plan_Estudio p " +
+                    "JOIN Carrera c ON p.carrera_id = c.id " +
+                    "WHERE p.estado = 'VIGENTE' " +
+                    "ORDER BY c.nombre ASC"
+                );
+                model.put("planes", planesVigentes);
+
                 return new ModelAndView(model, "student_form.mustache");
             },
             new MustacheTemplateEngine()
@@ -236,6 +509,7 @@ public class App {
             String email = req.queryParams("email");
             String legajo = req.queryParams("legajo");
             String tipoEstudiante = req.queryParams("tipo_estudiante");
+            String planEstudioId = req.queryParams("plan_estudio_id");
 
             if (
                 name == null ||
@@ -243,7 +517,8 @@ public class App {
                 dni == null ||
                 email == null ||
                 legajo == null ||
-                tipoEstudiante == null
+                tipoEstudiante == null ||
+                planEstudioId == null || planEstudioId.isBlank()
             ) {
                 String errorMsg = URLEncoder.encode(
                     "Todos los campos (incluyendo legajo) son obligatorios.",
@@ -254,6 +529,8 @@ public class App {
             }
 
             try {
+                Base.openTransaction();
+
                 // 2. Guardamos el Usuario base
                 User u = new User();
                 u.set("nombre", name, "apellido", lastName, "dni", dni);
@@ -262,12 +539,15 @@ public class App {
                 u.set("password", BCrypt.hashpw("1234", BCrypt.gensalt()));
                 u.saveIt();
 
-                // 3. Guardamos el Estudiante hijo
-                Student s = new Student();
-                s.set("usuario_id", u.getId()); // Fundamental para que la FK funcione
-                s.set("legajo", legajo);
-                s.set("tipo_estudiante", tipoEstudiante);
-                s.saveIt();
+                // 3. Guardamos el Estudiante hijo con SQL directo para evitar
+                // que ActiveJDBC confunda el INSERT con un UPDATE (ya que @IdName
+                // no es AUTO_INCREMENT y el id se provee explícitamente).
+                Base.exec(
+                    "INSERT INTO student (usuario_id, legajo, tipo_estudiante, plan_estudio_id) VALUES (?, ?, ?, ?)",
+                    u.getId(), legajo, tipoEstudiante, Integer.parseInt(planEstudioId)
+                );
+
+                Base.commitTransaction();
 
                 String successMsg = URLEncoder.encode(
                     "Estudiante registrado exitosamente con clave 1234.",
@@ -276,11 +556,12 @@ public class App {
                 res.redirect("/student/new?message=" + successMsg);
                 return "";
             } catch (Exception e) {
+                Base.rollbackTransaction();
                 e.printStackTrace();
                 res.redirect(
                     "/student/new?error=" +
                         URLEncoder.encode(
-                            "Error: El email, DNI o Legajo ya existe.",
+                            "Error al registrar: " + e.getMessage(),
                             StandardCharsets.UTF_8.toString()
                         )
                 );
@@ -771,11 +1052,10 @@ public class App {
             String cuil = req.queryParams("teacher_cuil");
             String email = req.queryParams("teacher_email");
             String especialidad = req.queryParams("especialidad");
+            String carreraId = req.queryParams("carrera_id");
 
-            if (name == null || lastName == null || dni == null) {
-                res.redirect(
-                    "/teacher/new?error=Los campos Nombre, Apellido y DNI son obligatorios."
-                );
+            if (name == null || lastName == null || dni == null || carreraId == null || carreraId.isBlank()) {
+                res.redirect("/teacher/new?error=Los campos Nombre, Apellido, DNI y Carrera son obligatorios.");
                 return "";
             }
 
@@ -800,6 +1080,11 @@ public class App {
                 t.set("email", email, "especialidad", especialidad);
                 t.saveIt();
 
+                DocenteCarrera dc = new DocenteCarrera();
+                dc.set("teacher_id", u.getId());
+                dc.set("carrera_id", Integer.parseInt(carreraId));
+                dc.saveIt();
+
                 // Cuando la creacion es exitosa
                 String mensajeExito =
                     "Docente " + name + " registrado con éxito.";
@@ -821,6 +1106,406 @@ public class App {
                 return "";
             }
         });
+
+        post("/teacher/assign-materia", (req, res) -> {
+            String userRole = req.session().attribute("userRole");
+            if (userRole == null || (!userRole.equals("SECRETARIA") && !userRole.equals("ADMIN"))) {
+                String errorMessage = URLEncoder.encode(
+                    "Acceso denegado. Solo SECRETARIA puede asignar materias.",
+                    StandardCharsets.UTF_8.toString()
+                );
+                res.redirect("/dashboard?error=" + errorMessage);
+                return "";
+            }
+
+            String teacherIdParam = req.queryParams("teacher_id");
+            String materiaIdParam = req.queryParams("materia_id");
+
+            if (
+                teacherIdParam == null ||
+                teacherIdParam.isEmpty() ||
+                materiaIdParam == null ||
+                materiaIdParam.isEmpty()
+            ) {
+                String errorMessage = URLEncoder.encode(
+                    "Debes seleccionar un docente y una materia.",
+                    StandardCharsets.UTF_8.toString()
+                );
+                res.redirect("/teacher/assign-materia?error=" + errorMessage);
+                return "";
+            }
+
+            try {
+                int teacherId = Integer.parseInt(teacherIdParam);
+                int materiaId = Integer.parseInt(materiaIdParam);
+
+                Teacher teacher = (Teacher) Teacher.findFirst("usuario_id = ?", teacherId);
+                Materia materia = (Materia) Materia.findFirst("codigo = ?", materiaId);
+
+                if (teacher == null || materia == null) {
+                    String errorMessage = URLEncoder.encode(
+                        "Docente o materia no válida.",
+                        StandardCharsets.UTF_8.toString()
+                    );
+                    res.redirect("/teacher/assign-materia?error=" + errorMessage);
+                    return "";
+                }
+
+                DocenteMateria existing = DocenteMateria.findFirst(
+                    "teacher_id = ? AND materia_id = ?",
+                    teacherId,
+                    materiaId
+                );
+
+                if (existing != null) {
+                    String errorMessage = URLEncoder.encode(
+                        "Esta asignación ya existe.",
+                        StandardCharsets.UTF_8.toString()
+                    );
+                    res.redirect("/teacher/assign-materia?error=" + errorMessage);
+                    return "";
+                }
+
+                DocenteMateria nuevo = new DocenteMateria();
+                nuevo.set("teacher_id", teacherId, "materia_id", materiaId);
+                nuevo.saveIt();
+
+                String successMessage = URLEncoder.encode(
+                    "Materia asignada correctamente al docente.",
+                    StandardCharsets.UTF_8.toString()
+                );
+                res.redirect("/teacher/assign-materia?message=" + successMessage);
+                return "";
+            } catch (NumberFormatException e) {
+                String errorMessage = URLEncoder.encode(
+                    "Los identificadores de docente y materia deben ser numéricos.",
+                    StandardCharsets.UTF_8.toString()
+                );
+                res.redirect("/teacher/assign-materia?error=" + errorMessage);
+                return "";
+            } catch (Exception e) {
+                e.printStackTrace();
+                String errorMessage = URLEncoder.encode(
+                    "Error interno al asignar la materia. Intente de nuevo.",
+                    StandardCharsets.UTF_8.toString()
+                );
+                res.redirect("/teacher/assign-materia?error=" + errorMessage);
+                return "";
+            }
+        });
+
+        // ==========================================
+// PANEL DEL DOCENTE — IS-19
+// ==========================================
+
+// Helper de autorización reutilizable
+// (definido como lambda local al inicio de main, antes del primer get/post)
+
+// GET /docente/materias — lista las materias asignadas al docente logueado
+get("/docente/materias", (req, res) -> {
+    String userRole = req.session().attribute("userRole");
+    if (userRole == null || !userRole.equals("DOCENTE")) {
+        res.redirect("/dashboard?error=" + URLEncoder.encode(
+            "Acceso denegado. Solo docentes pueden acceder a esta sección.",
+            StandardCharsets.UTF_8.toString()));
+        return null;
+    }
+
+    Map<String, Object> model = new HashMap<>();
+
+    String successMessage = req.queryParams("message");
+    String errorMessage   = req.queryParams("error");
+    if (successMessage != null && !successMessage.isEmpty()) model.put("successMessage", successMessage);
+    if (errorMessage   != null && !errorMessage.isEmpty())   model.put("errorMessage",   errorMessage);
+
+    // Obtenemos el Teacher a partir del userId guardado en sesión
+    Integer userId = req.session().attribute("userId");
+    Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
+
+    if (teacher == null) {
+        res.redirect("/dashboard?error=" + URLEncoder.encode(
+            "No se encontró un perfil docente para tu usuario.",
+            StandardCharsets.UTF_8.toString()));
+        return null;
+    }
+
+    int teacherId = teacher.getInteger("usuario_id");
+
+    // Buscamos las materias asignadas vía Docente_Materia
+    List<Map> materiasRaw = Base.findAll(
+        "SELECT m.codigo, m.nombre, m.anio_cursada " +
+        "FROM Materia m " +
+        "JOIN Docente_Materia dm ON m.codigo = dm.materia_id " +
+        "WHERE dm.teacher_id = ? " +
+        "ORDER BY m.anio_cursada ASC, m.nombre ASC",
+        teacherId
+    );
+
+    model.put("materias",    materiasRaw);
+    model.put("sinMaterias", materiasRaw.isEmpty());
+
+    return new ModelAndView(model, "docente_materias.mustache");
+}, new MustacheTemplateEngine());
+
+
+// GET /docente/materia/:materiaId — panel de acciones de una materia concreta
+get("/docente/materia/:materiaId", (req, res) -> {
+    String userRole = req.session().attribute("userRole");
+    if (userRole == null || !userRole.equals("DOCENTE")) {
+        res.redirect("/dashboard?error=" + URLEncoder.encode(
+            "Acceso denegado.", StandardCharsets.UTF_8.toString()));
+        return null;
+    }
+
+    Integer userId  = req.session().attribute("userId");
+    Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
+    if (teacher == null) { res.redirect("/dashboard"); return null; }
+
+    int teacherId  = teacher.getInteger("usuario_id");
+    int materiaId;
+    try {
+        materiaId = Integer.parseInt(req.params("materiaId"));
+    } catch (NumberFormatException e) {
+        res.redirect("/docente/materias?error=" + URLEncoder.encode(
+            "Materia inválida.", StandardCharsets.UTF_8.toString()));
+        return null;
+    }
+
+    // Verificamos que la materia le pertenezca al docente
+    DocenteMateria asignacion = DocenteMateria.findFirst(
+        "teacher_id = ? AND materia_id = ?", teacherId, materiaId);
+    if (asignacion == null) {
+        res.redirect("/docente/materias?error=" + URLEncoder.encode(
+            "No tenés acceso a esa materia.", StandardCharsets.UTF_8.toString()));
+        return null;
+    }
+
+    Materia materia = Materia.findFirst("codigo = ?", materiaId);
+    if (materia == null) { res.redirect("/docente/materias"); return null; }
+
+    // Periodo vigente de la materia
+    MateriaPeriodo periodo = MateriaPeriodo.findFirst("materia_codigo = ?", materiaId);
+    String periodoLabel = "";
+    if (periodo != null) {
+        String raw = periodo.getString("tipo_cuatrimestre");
+        if      ("PRIMER_CUATRIMESTRE".equals(raw))  periodoLabel = "I Cuatrimestre";
+        else if ("SEGUNDO_CUATRIMESTRE".equals(raw))  periodoLabel = "II Cuatrimestre";
+        else if ("ANUAL".equals(raw))                 periodoLabel = "Anual";
+        else if ("VERANO".equals(raw))                periodoLabel = "Verano";
+    }
+
+    // Alumnos para el selector de notas (todos los students)
+    List<Map<String, Object>> alumnosOptions = new ArrayList<>();
+    for (Model studentRecord : Student.findAll()) {
+        Student student = (Student) studentRecord;
+        User   user     = student.getUser();
+        String label    = user != null
+            ? user.getString("apellido") + ", " + user.getString("nombre") +
+              " — " + student.getLegajo()
+            : "Alumno #" + student.getInteger("usuario_id");
+        Map<String, Object> opt = new HashMap<>();
+        opt.put("id",    student.getInteger("usuario_id"));
+        opt.put("label", label);
+        alumnosOptions.add(opt);
+    }
+
+    Map<String, Object> model = new HashMap<>();
+    model.put("codigoMateria", materiaId);
+    model.put("nombreMateria", materia.getString("nombre"));
+    model.put("anioMateria",   materia.getInteger("anio_cursada"));
+    model.put("periodoMateria", periodoLabel);
+    model.put("alumnos",       alumnosOptions);
+
+    String successMessage = req.queryParams("message");
+    String errorMessage   = req.queryParams("error");
+    if (successMessage != null && !successMessage.isEmpty()) model.put("successMessage", successMessage);
+    if (errorMessage   != null && !errorMessage.isEmpty())   model.put("errorMessage",   errorMessage);
+
+    return new ModelAndView(model, "docente_panel_materia.mustache");
+}, new MustacheTemplateEngine());
+
+
+// POST /docente/materia/:materiaId/anuncio — persiste un anuncio
+post("/docente/materia/:materiaId/anuncio", (req, res) -> {
+    String userRole = req.session().attribute("userRole");
+    if (userRole == null || !userRole.equals("DOCENTE")) {
+        res.redirect("/dashboard?error=" + URLEncoder.encode(
+            "Acceso denegado.", StandardCharsets.UTF_8.toString()));
+        return "";
+    }
+
+    Integer userId  = req.session().attribute("userId");
+    Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
+    int teacherId   = teacher.getInteger("usuario_id");
+    int materiaId   = Integer.parseInt(req.params("materiaId"));
+
+    // Verificar pertenencia
+    if (DocenteMateria.findFirst("teacher_id = ? AND materia_id = ?", teacherId, materiaId) == null) {
+        res.redirect("/docente/materias?error=" + URLEncoder.encode(
+            "No tenés acceso a esa materia.", StandardCharsets.UTF_8.toString()));
+        return "";
+    }
+
+    // Obtener el MateriaPeriodo vigente
+    MateriaPeriodo mp = MateriaPeriodo.findFirst("materia_codigo = ?", materiaId);
+    if (mp == null) {
+        res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
+            "No existe un período activo para esta materia.", StandardCharsets.UTF_8.toString()));
+        return "";
+    }
+
+    String tipo        = req.queryParams("tipo");
+    String titulo      = req.queryParams("titulo");
+    String contenido   = req.queryParams("contenido");
+    String fechaExamen = req.queryParams("fecha_examen");
+
+    try {
+        Anuncio anuncio = new Anuncio();
+        anuncio.set("materia_periodo_id", mp.getId());
+        anuncio.set("teacher_id",         teacherId);
+        anuncio.set("tipo",               tipo);
+        anuncio.set("titulo",             titulo);
+        anuncio.set("contenido",          contenido);
+        if ("EXAMEN".equals(tipo) && fechaExamen != null && !fechaExamen.isBlank()) {
+            anuncio.set("fecha_examen", java.sql.Date.valueOf(fechaExamen));
+        }
+        anuncio.saveIt();
+
+        res.redirect("/docente/materia/" + materiaId + "?message=" + URLEncoder.encode(
+            "Anuncio publicado correctamente.", StandardCharsets.UTF_8.toString()));
+    } catch (Exception e) {
+        e.printStackTrace();
+        res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
+            "Error al publicar el anuncio: " + e.getMessage(), StandardCharsets.UTF_8.toString()));
+    }
+    return "";
+});
+
+
+// POST /docente/materia/:materiaId/nota — persiste una nota
+post("/docente/materia/:materiaId/nota", (req, res) -> {
+    String userRole = req.session().attribute("userRole");
+    if (userRole == null || !userRole.equals("DOCENTE")) {
+        res.redirect("/dashboard?error=" + URLEncoder.encode(
+            "Acceso denegado.", StandardCharsets.UTF_8.toString()));
+        return "";
+    }
+
+    Integer userId  = req.session().attribute("userId");
+    Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
+    int teacherId   = teacher.getInteger("usuario_id");
+    int materiaId   = Integer.parseInt(req.params("materiaId"));
+
+    if (DocenteMateria.findFirst("teacher_id = ? AND materia_id = ?", teacherId, materiaId) == null) {
+        res.redirect("/docente/materias?error=" + URLEncoder.encode(
+            "No tenés acceso a esa materia.", StandardCharsets.UTF_8.toString()));
+        return "";
+    }
+
+    MateriaPeriodo mp = MateriaPeriodo.findFirst("materia_codigo = ?", materiaId);
+    if (mp == null) {
+        res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
+            "No existe un período activo para esta materia.", StandardCharsets.UTF_8.toString()));
+        return "";
+    }
+
+    String studentIdParam = req.queryParams("student_id");
+    String valorParam     = req.queryParams("valor");
+
+    if (studentIdParam == null || studentIdParam.isEmpty() || valorParam == null || valorParam.isEmpty()) {
+        res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
+            "Debés seleccionar un alumno e ingresar una nota.", StandardCharsets.UTF_8.toString()));
+        return "";
+    }
+
+    try {
+        int    studentId = Integer.parseInt(studentIdParam);
+        double valor     = Double.parseDouble(valorParam);
+
+        if (valor < 0 || valor > 10) throw new IllegalArgumentException("La nota debe estar entre 0 y 10.");
+
+        Nota nota = new Nota();
+        nota.set("materia_periodo_id", mp.getId());
+        nota.set("student_id",         studentId);
+        nota.set("teacher_id",         teacherId);
+        nota.set("valor",              valor);
+        nota.saveIt();
+
+        res.redirect("/docente/materia/" + materiaId + "?message=" + URLEncoder.encode(
+            "Nota registrada correctamente.", StandardCharsets.UTF_8.toString()));
+    } catch (Exception e) {
+        e.printStackTrace();
+        res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
+            "Error al registrar la nota: " + e.getMessage(), StandardCharsets.UTF_8.toString()));
+    }
+    return "";
+});
+
+
+// POST /docente/materia/:materiaId/aula — persiste asignación de aula
+post("/docente/materia/:materiaId/aula", (req, res) -> {
+    String userRole = req.session().attribute("userRole");
+    if (userRole == null || !userRole.equals("DOCENTE")) {
+        res.redirect("/dashboard?error=" + URLEncoder.encode(
+            "Acceso denegado.", StandardCharsets.UTF_8.toString()));
+        return "";
+    }
+
+    Integer userId  = req.session().attribute("userId");
+    Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
+    int teacherId   = teacher.getInteger("usuario_id");
+    int materiaId   = Integer.parseInt(req.params("materiaId"));
+
+    if (DocenteMateria.findFirst("teacher_id = ? AND materia_id = ?", teacherId, materiaId) == null) {
+        res.redirect("/docente/materias?error=" + URLEncoder.encode(
+            "No tenés acceso a esa materia.", StandardCharsets.UTF_8.toString()));
+        return "";
+    }
+
+    MateriaPeriodo mp = MateriaPeriodo.findFirst("materia_codigo = ?", materiaId);
+    if (mp == null) {
+        res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
+            "No existe un período activo para esta materia.", StandardCharsets.UTF_8.toString()));
+        return "";
+    }
+
+    String aula = req.queryParams("aula");
+    if (aula == null || aula.isBlank()) {
+        res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
+            "Debés ingresar el nombre o número del aula.", StandardCharsets.UTF_8.toString()));
+        return "";
+    }
+
+    try {
+        AulaAsignacion asig = new AulaAsignacion();
+        asig.set("materia_periodo_id", mp.getId());
+        asig.set("teacher_id",         teacherId);
+        asig.set("aula",               aula);
+        asig.saveIt();
+
+        res.redirect("/docente/materia/" + materiaId + "?message=" + URLEncoder.encode(
+            "Aula asignada correctamente.", StandardCharsets.UTF_8.toString()));
+    } catch (Exception e) {
+        e.printStackTrace();
+        res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
+            "Error al asignar el aula: " + e.getMessage(), StandardCharsets.UTF_8.toString()));
+    }
+    return "";
+});
+
+
+// GET /docente/materia/:materiaId/contenido — stub "Próximamente"
+get("/docente/materia/:materiaId/contenido", (req, res) -> {
+    String userRole = req.session().attribute("userRole");
+    if (userRole == null || !userRole.equals("DOCENTE")) {
+        res.redirect("/dashboard?error=" + URLEncoder.encode(
+            "Acceso denegado.", StandardCharsets.UTF_8.toString()));
+        return null;
+    }
+    return new ModelAndView(new HashMap<>(), "contenido_proximamente.mustache");
+}, new MustacheTemplateEngine());
+
+
 
         // POST: Maneja el envío del formulario de inicio de sesión.
         post(
@@ -945,6 +1630,363 @@ public class App {
                     )
                 );
             }
+        });
+        // ======================================
+        // INSCRIPCION A CURSADA
+        // ======================================
+        get("/estudiante/inscripcion/cursada", (req, res) -> {
+            String currentUsername = req.session().attribute("currentUserUsername");
+            String userRole = req.session().attribute("userRole");
+            if (currentUsername == null || !"ESTUDIANTE".equals(userRole)) {
+                res.redirect("/");
+                return null;
+            }
+
+            List<Map> studentRows = Base.findAll(
+                "SELECT s.usuario_id, s.plan_estudio_id FROM student s " +
+                "JOIN users u ON u.id = s.usuario_id WHERE u.nombre_usuario = ?",
+                currentUsername
+            );
+            if (studentRows.isEmpty()) {
+                res.redirect("/dashboard?error=No+se+encontro+el+estudiante");
+                return null;
+            }
+            int alumnoId = ((Number) studentRows.get(0).get("usuario_id")).intValue();
+            int planId   = ((Number) studentRows.get(0).get("plan_estudio_id")).intValue();
+
+            List<Map<String, Object>> materiasDisponibles = new ArrayList<>();
+
+            // 1. Obtener todas las materias del plan de estudios via SQL directo
+            List<Map> materiasPlan = Base.findAll(
+                "SELECT codigo, nombre, anio_cursada FROM Materia WHERE plan_estudio_id = ?", planId
+            );
+
+            for (Map m : materiasPlan) {
+                // ActiveJDBC devuelve los valores numéricos como Long o BigInteger según el driver
+                int materiaCodigo = ((Number) m.get("codigo")).intValue();
+
+                // 2. Excluir las que ya están en Estado_Academico
+                List<Map> estadoRows = Base.findAll(
+                        "SELECT id FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
+                        alumnoId, materiaCodigo
+                );
+                
+                if (!estadoRows.isEmpty()) {
+                    continue; // Ya tiene registro, la salteamos
+                }
+
+                // 3. Validar correlatividades tipo 'CURSAR'
+                List<Map> requisitos = Base.findAll(
+                        "SELECT materia_correlativa_codigo, condicion FROM Correlatividad WHERE materia_codigo = ? AND tipo_requisito = 'CURSAR'",
+                        materiaCodigo
+                );
+
+                boolean cumpleCorrelatividades = true;
+                for (Map reqItem : requisitos) {
+                    int reqCodigo = ((Number) reqItem.get("materia_correlativa_codigo")).intValue();
+                    String condicionRequerida = (String) reqItem.get("condicion");
+
+                    List<Map> estadoReqRows = Base.findAll(
+                            "SELECT estado FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
+                            alumnoId, reqCodigo
+                    );
+
+                    if (estadoReqRows.isEmpty()) {
+                        cumpleCorrelatividades = false;
+                        break;
+                    }
+                    
+                    String estadoActual = (String) estadoReqRows.get(0).get("estado");
+                    
+                    if ("APROBADA".equals(condicionRequerida) && !"APROBADO".equals(estadoActual)) {
+                        cumpleCorrelatividades = false;
+                        break;
+                    }
+                    
+                    if ("REGULAR".equals(condicionRequerida) && (!"REGULAR".equals(estadoActual) && !"APROBADO".equals(estadoActual))) {
+                        cumpleCorrelatividades = false;
+                        break;
+                    }
+                }
+
+                if (cumpleCorrelatividades) {
+                    Map<String, Object> matData = new HashMap<>();
+                    matData.put("codigo", materiaCodigo);
+                    matData.put("nombre", m.get("nombre"));
+                    matData.put("anio_cursada", m.get("anio_cursada"));
+                    materiasDisponibles.add(matData);
+                }
+            }
+
+            Map<String, Object> viewData = new HashMap<>();
+            viewData.put("materias", materiasDisponibles);
+            
+            String successMessage = req.queryParams("message");
+            String errorMessage = req.queryParams("error");
+            if (successMessage != null) viewData.put("successMessage", successMessage);
+            if (errorMessage != null) viewData.put("errorMessage", errorMessage);
+
+            return new spark.template.mustache.MustacheTemplateEngine().render(
+                    new spark.ModelAndView(viewData, "inscripcion_materias.mustache")
+            );
+        });
+
+        post("/estudiante/inscripcion/cursada", (req, res) -> {
+            String currentUsername = req.session().attribute("currentUserUsername");
+            String userRole = req.session().attribute("userRole");
+            if (currentUsername == null || !"ESTUDIANTE".equals(userRole)) {
+                res.status(403);
+                return "No autorizado";
+            }
+
+            User u = User.findFirst("nombre_usuario = ?", currentUsername);
+            Student s = Student.findById(u.getId());
+            int alumnoId = s.getInteger("usuario_id");
+            
+            String materiaCodigoStr = req.queryParams("materia_codigo");
+            if (materiaCodigoStr == null || materiaCodigoStr.isEmpty()) {
+                res.redirect("/estudiante/inscripcion/cursada?error=Materia+no+especificada");
+                return null;
+            }
+            int materiaCodigo = Integer.parseInt(materiaCodigoStr);
+            Materia materiaObj = Materia.findById(materiaCodigo);
+
+            if (materiaObj == null || materiaObj.getInteger("plan_estudio_id") != s.getInteger("plan_estudio_id")) {
+                res.redirect("/estudiante/inscripcion/cursada?error=Materia+no+valida");
+                return null;
+            }
+
+            // 1. Validar que no exista en Estado_Academico
+            List<Map> estadoRows = org.javalite.activejdbc.Base.findAll(
+                    "SELECT id FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
+                    alumnoId, materiaCodigo
+            );
+            if (!estadoRows.isEmpty()) {
+                res.redirect("/estudiante/inscripcion/cursada?error=Ya+te+encuentras+inscripto+en+esta+materia");
+                return null;
+            }
+
+            // 2. Re-validar Correlatividades tipo 'CURSAR'
+            List<Map> requisitos = org.javalite.activejdbc.Base.findAll(
+                    "SELECT materia_correlativa_codigo, condicion FROM Correlatividad WHERE materia_codigo = ? AND tipo_requisito = 'CURSAR'",
+                    materiaCodigo
+            );
+
+            for (Map reqItem : requisitos) {
+                int reqCodigo = ((Number) reqItem.get("materia_correlativa_codigo")).intValue();
+                String condicionRequerida = (String) reqItem.get("condicion");
+
+                List<Map> estadoReqRows = org.javalite.activejdbc.Base.findAll(
+                        "SELECT estado FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
+                        alumnoId, reqCodigo
+                );
+
+                if (estadoReqRows.isEmpty()) {
+                    res.redirect("/estudiante/inscripcion/cursada?error=No+cumples+las+correlatividades");
+                    return null;
+                }
+                
+                String estadoActual = (String) estadoReqRows.get(0).get("estado");
+                
+                if ("APROBADA".equals(condicionRequerida) && !"APROBADO".equals(estadoActual)) {
+                    res.redirect("/estudiante/inscripcion/cursada?error=No+cumples+las+correlatividades");
+                    return null;
+                }
+                if ("REGULAR".equals(condicionRequerida) && (!"REGULAR".equals(estadoActual) && !"APROBADO".equals(estadoActual))) {
+                    res.redirect("/estudiante/inscripcion/cursada?error=No+cumples+las+correlatividades");
+                    return null;
+                }
+            }
+
+            // 3. Persistir en Estado_Academico
+            try {
+                org.javalite.activejdbc.Base.exec(
+                    "INSERT INTO Estado_Academico (usuario_id, materia_codigo, estado) VALUES (?, ?, ?)",
+                    alumnoId, materiaCodigo, "INSCRIPTO"
+                );
+                res.redirect("/estudiante/inscripcion/cursada?message=Inscripcion+exitosa");
+                return null;
+            } catch (Exception e) {
+                e.printStackTrace();
+                res.redirect("/estudiante/inscripcion/cursada?error=Ocurrio+un+error+al+inscribirse");
+                return null;
+            }
+        });
+
+        // ======================================
+        // INSCRIPCION A MESA DE EXAMEN
+        //=======================================
+        // ISSUE: Listar mesas de examen disponibles para el estudiante
+        get("/estudiante/inscripcion/examen", (req, res) -> {
+            String currentUsernameEx = req.session().attribute("currentUserUsername");
+            String userRoleEx = req.session().attribute("userRole");
+            if (currentUsernameEx == null || !"ESTUDIANTE".equals(userRoleEx)) {
+                res.redirect("/login");
+                return null;
+            }
+            List<Map> studentRowsEx = Base.findAll(
+                "SELECT s.usuario_id FROM student s " +
+                "JOIN users u ON u.id = s.usuario_id WHERE u.nombre_usuario = ?",
+                currentUsernameEx
+            );
+            if (studentRowsEx.isEmpty()) {
+                res.redirect("/dashboard?error=No+se+encontro+el+estudiante");
+                return null;
+            }
+            int alumnoId = ((Number) studentRowsEx.get(0).get("usuario_id")).intValue();
+            List<Map<String, Object>> mesasHabilitadas = new ArrayList<>();
+
+            // 1. Obtener todas las mesas de examen via SQL directo
+            List<Map> todasLasMesas = Base.findAll(
+                "SELECT id, materia_codigo, fecha FROM Mesa_Examen"
+            );
+
+            for (Map mesa : todasLasMesas) {
+                int materiaCodigo = ((Number) mesa.get("materia_codigo")).intValue();
+
+                // 2. Consultar el Estado Académico del alumno para esta materia
+                List<Map> estadoRows = Base.findAll(
+                        "SELECT estado FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
+                        alumnoId, materiaCodigo
+                );
+
+                if (!estadoRows.isEmpty()) {
+                    String estado = (String) estadoRows.get(0).get("estado");
+
+                    // Condición de Negocio: Solo REGULAR o LIBRE
+                    if ("REGULAR".equals(estado) || "LIBRE".equals(estado)) {
+
+                        // 3. Validar correlatividades de tipo 'RENDIR'
+                        List<Map> requisitos = Base.findAll(
+                                "SELECT materia_correlativa_codigo FROM Correlatividad WHERE materia_codigo = ? AND tipo_requisito = 'RENDIR'",
+                                materiaCodigo
+                        );
+
+                        boolean cumpleCorrelatividades = true;
+                        for (Map reqItem : requisitos) {
+                            int reqCodigo = ((Number) reqItem.get("materia_correlativa_codigo")).intValue();
+
+                            List<Map> estadoReqRows = Base.findAll(
+                                    "SELECT estado FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
+                                    alumnoId, reqCodigo
+                            );
+
+                            if (estadoReqRows.isEmpty() || !"APROBADO".equals(estadoReqRows.get(0).get("estado"))) {
+                                cumpleCorrelatividades = false;
+                                break;
+                            }
+                        }
+
+                        if (cumpleCorrelatividades) {
+                            Map<String, Object> mesaData = new HashMap<>();
+                            mesaData.put("id", ((Number) mesa.get("id")).intValue());
+                            mesaData.put("materia_codigo", materiaCodigo);
+                            mesaData.put("fecha", mesa.get("fecha"));
+                            mesasHabilitadas.add(mesaData);
+                        }
+                    }
+                }
+            }
+
+            Map<String, Object> viewData = new HashMap<>();
+            viewData.put("mesas", mesasHabilitadas);
+            String successMsgEx = req.queryParams("success");
+            String errorMsgEx   = req.queryParams("error");
+            if (successMsgEx != null) viewData.put("successMessage", successMsgEx);
+            if (errorMsgEx   != null) viewData.put("errorMessage",   errorMsgEx);
+
+            return new spark.template.mustache.MustacheTemplateEngine().render(
+                    new spark.ModelAndView(viewData, "inscripcion_examenes.mustache")
+            );
+        });
+
+        // ISSUE: Procesar la inscripción del estudiante a la mesa de examen seleccionada
+        post("/estudiante/inscripcion/examen", (req, res) -> {
+            String currentUsernamePost = req.session().attribute("currentUserUsername");
+            String userRolePost = req.session().attribute("userRole");
+            if (currentUsernamePost == null || !"ESTUDIANTE".equals(userRolePost)) {
+                res.status(403);
+                return "No autorizado";
+            }
+            List<Map> studentRowsPost = Base.findAll(
+                "SELECT s.usuario_id FROM student s " +
+                "JOIN users u ON u.id = s.usuario_id WHERE u.nombre_usuario = ?",
+                currentUsernamePost
+            );
+            if (studentRowsPost.isEmpty()) {
+                res.redirect("/dashboard?error=No+se+encontro+el+estudiante");
+                return null;
+            }
+            int alumnoId = ((Number) studentRowsPost.get(0).get("usuario_id")).intValue();
+            String mesaIdStr = req.queryParams("mesa_id");
+
+            if (mesaIdStr == null || mesaIdStr.isEmpty()) {
+                res.redirect("/estudiante/inscripcion/examen?error=Mesa no especificada");
+                return null;
+            }
+
+            int mesaId = Integer.parseInt(mesaIdStr);
+            List<Map> mesaRows = Base.findAll(
+                "SELECT id, materia_codigo FROM Mesa_Examen WHERE id = ?", mesaId
+            );
+
+            // VALIDACIONES DE SEGURIDAD
+            if (mesaRows.isEmpty()) {
+                res.redirect("/estudiante/inscripcion/examen?error=La+mesa+seleccionada+no+existe");
+                return null;
+            }
+
+            int materiaCodigo2 = ((Number) mesaRows.get(0).get("materia_codigo")).intValue();
+
+            // 1. Re-verificar Estado Académico
+            List<Map> estadoRows = Base.findAll(
+                    "SELECT estado FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
+                    alumnoId, materiaCodigo2
+            );
+
+            if (estadoRows.isEmpty()) {
+                res.redirect("/estudiante/inscripcion/examen?error=No+posees+estado+academico+en+esta+materia");
+                return null;
+            }
+
+            String estado = (String) estadoRows.get(0).get("estado");
+            if (!"REGULAR".equals(estado) && !"LIBRE".equals(estado)) {
+                res.redirect("/estudiante/inscripcion/examen?error=Tu+condicion+academica+no+te+permite+rendir+esta+materia");
+                return null;
+            }
+
+            // 2. Re-verificar Correlatividades de tipo 'RENDIR'
+            List<Map> requisitosPost = Base.findAll(
+                    "SELECT materia_correlativa_codigo FROM Correlatividad WHERE materia_codigo = ? AND tipo_requisito = 'RENDIR'",
+                    materiaCodigo2
+            );
+
+            for (Map reqItem : requisitosPost) {
+                int reqCodigo = ((Number) reqItem.get("materia_correlativa_codigo")).intValue();
+
+                List<Map> estadoReqRows = Base.findAll(
+                        "SELECT estado FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
+                        alumnoId, reqCodigo
+                );
+
+                if (estadoReqRows.isEmpty() || !"APROBADO".equals(estadoReqRows.get(0).get("estado"))) {
+                    res.redirect("/estudiante/inscripcion/examen?error=No+cumples+con+las+correlatividades+requeridas+para+rendir");
+                    return null;
+                }
+            }
+
+            // 3. Persistir la inscripción en la base de datos
+            try {
+                Base.exec(
+                    "INSERT INTO Inscripcion_Examen (usuario_id, mesa_id) VALUES (?, ?)",
+                    alumnoId, mesaId
+                );
+                res.redirect("/estudiante/inscripcion/examen?success=Te+has+inscripto+a+la+mesa+con+exito");
+            } catch (Exception e) {
+                res.redirect("/estudiante/inscripcion/examen?error=Ya+te+encuentras+inscripto+en+esta+mesa+de+examen");
+            }
+
+            return null;
         });
     } 
 } 

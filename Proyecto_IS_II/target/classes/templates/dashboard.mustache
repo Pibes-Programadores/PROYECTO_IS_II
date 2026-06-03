@@ -10,6 +10,17 @@
     <div class="w-full bg-gradient-to-b from-[#854f6c] to-[#dfb6b2] p-8 rounded-lg shadow-2xl shadow-black/60 w-full max-w-2xl">
         <h1 class="text-3xl font-bold text-center text-gray-50 mb-6">Panel de Control</h1>
 
+        {{#successMessage}}
+        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
+            <span class="block sm:inline">{{successMessage}}</span>
+        </div>
+        {{/successMessage}}
+        {{#errorMessage}}
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+            <span class="block sm:inline">{{errorMessage}}</span>
+        </div>
+        {{/errorMessage}}
+
         {{#username}}
         <p class="text-xl text-center text-gray-50 mb-8">¡Bienvenido, <span class="font-semibold text-blue-600">{{username}}</span>!</p>
         {{/username}}
@@ -36,6 +47,12 @@
             </div>
 
             <div class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-lg w-full max-w-2xl">
+                <h2 class="text-2xl font-bold text-yellow-400 mb-3">Asignar materia a docente</h2>
+                <p class="text-gray-50 mb-4">Relacionar una materia con un docente del sistema.</p>
+                <a href="/teacher/assign-materia" class="inline-block bg-yellow-500 text-white py-2 px-4 rounded-md hover:bg-yellow-700 transition duration-300">Asignar</a>
+            </div>
+
+            <div class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-lg w-full max-w-2xl">
                 <h2 class="text-2xl font-bold text-green-400 mb-3">Cargar un estudiante</h2>
                 <p class="text-gray-50 mb-4">Gestionar el alta de un alumno de la universidad.</p>
                 <a href="/student/new" class="inline-block bg-green-500 text-white py-2 px-4 rounded-md hover:bg-green-700 transition duration-300">Cargar</a>
@@ -57,13 +74,37 @@
                 <a href="/materia/new" class="inline-block bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition duration-300">Cargar</a>
             </div>
             {{/isAdmin}}
+
+            {{#isDocente}}
+            <div class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-lg w-full max-w-2xl">
+                <h2 class="text-2xl font-bold text-purple-400 mb-3">Mis Materias</h2>
+                <p class="text-gray-50 mb-4">Gestioná tus materias: publicá anuncios, cargá notas y asigná aulas.</p>
+                <a href="/docente/materias" class="inline-block bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 transition duration-300">Ver Materias</a>
+            </div>
+            {{/isDocente}}
         </div>
 
-        <div class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-lg w-full max-w-2xl">
-                <h2 class="text-2xl font-bold text-[#ccd0fc] mb-3">Plan de Estudios</h2>
-                <p class="text-gray-50 mb-4">Visualizar la grilla completa de materias, regímenes de cursado y correlatividades por carrera.</p>
-                <a href="/carrera/materias" class="inline-block bg-zinc-800 text-white py-2 px-4 rounded-md hover:bg-zinc-900 transition duration-300">Ver Grilla</a>
+        {{#isEstudiante}}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-lg w-full max-w-2xl">
+                <h2 class="text-2xl font-bold text-green-400 mb-3">Inscripción a Materias</h2>
+                <p class="text-gray-50 mb-4">Inscribite en las materias habilitadas para cursar según tu plan de estudios.</p>
+                <a href="/estudiante/inscripcion/cursada" class="inline-block bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition duration-300">Inscribir Materias</a>
             </div>
+            
+            <div class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-lg w-full max-w-2xl">
+                <h2 class="text-2xl font-bold text-blue-400 mb-3">Inscripción a Exámenes</h2>
+                <p class="text-gray-50 mb-4">Anotate para rendir exámenes finales en las materias que tenés regulares o libres.</p>
+                <a href="/estudiante/inscripcion/examen" class="inline-block bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition duration-300">Inscribir Exámenes</a>
+            </div>
+        </div>
+        {{/isEstudiante}}
+
+        <div class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-lg w-full max-w-2xl">
+            <h2 class="text-2xl font-bold text-[#ccd0fc] mb-3">Plan de Estudios</h2>
+            <p class="text-gray-50 mb-4">Visualizar la grilla completa de materias, regímenes de cursado y correlatividades por carrera.</p>
+            <a href="/carrera/materias" class="inline-block bg-zinc-800 text-white py-2 px-4 rounded-md hover:bg-zinc-900 transition duration-300">Ver Grilla</a>
+        </div>
         <div class="text-center mt-6">
             <a href="/logout" class="inline-block bg-red-600 text-white py-2 px-6 rounded-md hover:bg-red-700 transition duration-300 text-lg">Cerrar Sesión</a>
         </div>

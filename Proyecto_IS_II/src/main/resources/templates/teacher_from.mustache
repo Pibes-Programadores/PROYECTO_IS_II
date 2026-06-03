@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Crear una cuenta</title>
+    <title>Iniciar sesión</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
 </head>
@@ -62,9 +62,19 @@
                 <input type="text" name="legajo_docente" required class="w-full px-4 py-2 border rounded-md">
             </div>
 
-            <div><form action="/
+            <div>
+                <label class="block text-[#ccd0fc] text-sm font-medium mb-1">Carrera de designación:</label>
+                <select name="carrera_id" required class="w-full px-4 py-2 border rounded-md text-black">
+                    <option value="" disabled selected>Seleccione una carrera</option>
+                    {{#carreras}}
+                        <option value="{{id}}">{{nombre}}</option>
+                    {{/carreras}}
+                </select>
+            </div>
+
+            <div>
                 <label class="block text-[#ccd0fc] text-sm font-medium mb-1">Email:</label>
-                <input type="email" name="teacher_email" required class="w-full px-4 py-2 border rounded-md">
+                <input type="email" name="teacher_email" required class="w-full px-4 py-2 border rounded-md text-black">
             </div>
 
             <div>
@@ -86,6 +96,6 @@
                 </a>
             </div>
         </form>
-
+    </div>
 </body>
 </html>

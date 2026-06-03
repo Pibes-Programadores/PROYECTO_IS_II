@@ -39,7 +39,7 @@ public final class DBConfigSingleton {
         }
     }
 
-    public void closeConnection() {
+    public void closeConnection(){
         if (Base.hasConnection()) {
             Base.close();
         }

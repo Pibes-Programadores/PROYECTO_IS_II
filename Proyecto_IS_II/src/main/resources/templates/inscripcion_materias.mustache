@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Inscripción a Materias</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <div class="bg-white/90 backdrop-blur-sm rounded-lg shadow-xl overflow-hidden border border-white/20">
+            <div class="bg-gradient-to-r from-blue-700 to-blue-500 p-6 text-white flex justify-between items-center shadow-md">
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight">Inscripción a Materias</h1>
+                    <p class="text-blue-100 mt-1 text-sm font-medium">Materias habilitadas para cursar según tu plan de estudios y correlatividades.</p>
+                </div>
+                <a href="/dashboard" class="px-5 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-md border border-white/30 rounded-md transition-all font-medium shadow-sm text-sm">
+                    Volver al Dashboard
+                </a>
+            </div>
+            
+            <div class="p-8">
+                {{#successMessage}}
+                <div class="bg-green-50 border-l-4 border-green-500 p-4 mb-6 rounded-r-md shadow-sm">
+                    <div class="flex items-center">
+                        <svg class="h-5 w-5 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        <p class="text-green-700 font-medium">{{successMessage}}</p>
+                    </div>
+                </div>
+                {{/successMessage}}
+                
+                {{#errorMessage}}
+                <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r-md shadow-sm">
+                    <div class="flex items-center">
+                        <svg class="h-5 w-5 text-red-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <p class="text-red-700 font-medium">{{errorMessage}}</p>
+                    </div>
+                </div>
+                {{/errorMessage}}
+
+                {{#materias}}
+                <div class="overflow-hidden rounded-lg border border-gray-200 shadow-sm">
+                    <table class="w-full text-left border-collapse bg-white">
+                        <thead>
+                            <tr class="bg-gray-50 border-b border-gray-200">
+                                <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Código</th>
+                                <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Materia</th>
+                                <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Año</th>
+                                <th class="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            {{#materias}}
+                            <tr class="hover:bg-blue-50/50 transition-colors group">
+                                <td class="px-6 py-4 text-sm text-gray-500 font-mono">{{codigo}}</td>
+                                <td class="px-6 py-4 text-sm font-semibold text-gray-800">{{nombre}}</td>
+                                <td class="px-6 py-4 text-sm text-gray-500 text-center">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                        {{anio_cursada}}º Año
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <form action="/estudiante/inscripcion/cursada" method="post" class="inline-block">
+                                        <input type="hidden" name="materia_codigo" value="{{codigo}}">
+                                        <button type="submit" 
+                                                class="px-5 py-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white text-sm font-medium rounded-md shadow-sm transition-all transform hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-2">
+                                            Inscribirse
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {{/materias}}
+                        </tbody>
+                    </table>
+                </div>
+                {{/materias}}
+                {{^materias}}
+                <div class="text-center py-16 px-4 bg-gray-50/80 rounded-xl border-2 border-gray-200 border-dashed shadow-inner">
+                    <div class="bg-white p-4 rounded-full inline-block shadow-sm mb-4">
+                        <svg class="h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-2">No hay materias disponibles</h3>
+                    <p class="text-gray-500 max-w-md mx-auto">Actualmente no tienes materias habilitadas para inscribirte en tu plan de estudios o no cumples con las correlatividades requeridas.</p>
+                </div>
+                {{/materias}}
+            </div>
+        </div>
+    </div>
+</body>
+</html>
