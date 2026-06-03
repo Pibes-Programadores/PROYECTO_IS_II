@@ -4,7 +4,7 @@ import org.javalite.activejdbc.Model;
 import org.javalite.activejdbc.annotations.Table;
 import org.javalite.activejdbc.annotations.BelongsTo;
 
-@Table("Inscripcion_Examen")
+@Table("inscripciones_examen")
 @BelongsTo(parent = User.class, foreignKeyName = "usuario_id")
 public class InscripcionExamen extends Model {
 

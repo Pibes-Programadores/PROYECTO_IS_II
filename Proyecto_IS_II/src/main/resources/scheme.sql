@@ -16,6 +16,8 @@ DROP TABLE IF EXISTS Correlatividad;
 DROP TABLE IF EXISTS Materia;
 DROP TABLE IF EXISTS Plan_Estudio;
 DROP TABLE IF EXISTS Carrera;
+DROP TABLE IF EXISTS inscripciones_examen;
+DROP TABLE IF EXISTS mesas_examen;
 
 -- Creación de la Tabla Base: Usuario
 CREATE TABLE users (
@@ -195,6 +197,23 @@ CREATE TABLE Aula_Asignacion (
     FOREIGN KEY (materia_periodo_id) REFERENCES Materia_Periodo(id) ON DELETE CASCADE,
     FOREIGN KEY (teacher_id) REFERENCES teacher(usuario_id) ON DELETE CASCADE
 )ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS mesas_examen (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    materia_codigo INT NOT NULL,
+    fecha DATE NOT NULL,
+    CONSTRAINT fk_mesa_materia FOREIGN KEY (materia_codigo) REFERENCES Materia(codigo) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS inscripciones_examen (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    usuario_id INT NOT NULL,
+    mesa_id INT NOT NULL,
+    fecha_inscripcion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_inscripcion_alumno FOREIGN KEY (usuario_id) REFERENCES student(usuario_id) ON DELETE CASCADE,
+    CONSTRAINT fk_inscripcion_mesa FOREIGN KEY (mesa_id) REFERENCES mesas_examen(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_alumno_mesa (usuario_id, mesa_id) -- Evita duplicados
+) ENGINE=InnoDB;
 
 INSERT IGNORE INTO users (dni, nombre, apellido, nombre_usuario, password, nivel_acceso) 
 VALUES (

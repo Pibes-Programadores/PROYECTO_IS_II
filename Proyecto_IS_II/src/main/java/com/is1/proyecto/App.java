@@ -85,6 +85,69 @@ public class App {
             }
         });
 
+        get("/estudiante/inscripcion/examen", (req, res) -> {
+            // 1. Leemos la sesión real usando las variables del proyecto
+            String currentUsername = req.session().attribute("currentUserUsername");
+            String userRole = req.session().attribute("userRole");
+            Boolean loggedIn = req.session().attribute("loggedIn");
+
+            // VALIDACIÓN REAL: Si no está logueado o no es estudiante, rebota al login de una
+            if (currentUsername == null || loggedIn == null || !loggedIn || !"ESTUDIANTE".equals(userRole)) {
+                res.redirect("/?error=" + URLEncoder.encode("Debes iniciar sesión como estudiante para acceder.", StandardCharsets.UTF_8.toString()));
+                return null;
+            }
+
+            // 2. Buscamos el ID en la base de datos de forma limpia con el usuario de la sesión
+            User alumno = User.findFirst("nombre_usuario = ?", currentUsername);
+            if (alumno == null) {
+                res.redirect("/?error=" + URLEncoder.encode("Usuario no encontrado.", StandardCharsets.UTF_8.toString()));
+                return null;
+            }
+            int alumnoId = (int) alumno.getId();
+
+            List<Map<String, Object>> mesasHabilitadas = new ArrayList<>();
+
+            try {
+                // 3. Traemos todas las mesas de examen disponibles de la BD usando ActiveJDBC
+                List<MesaExamen> todasLasMesas = MesaExamen.findAll();
+
+                for (MesaExamen mesa : todasLasMesas) {
+                    Map<String, Object> datosMesa = new HashMap<>();
+                    datosMesa.put("id", mesa.getId());
+                    datosMesa.put("fecha", mesa.get("fecha"));
+
+                    // Buscamos el nombre de la materia vinculada a la mesa
+                    Materia materia = Materia.findById(mesa.get("materia_codigo"));
+                    if (materia != null) {
+                        datosMesa.put("materia_nombre", materia.get("nombre"));
+                    } else {
+                        datosMesa.put("materia_nombre", "Materia Desconocida");
+                    }
+
+                    // Chequeamos si el alumno ya se inscribió a esta mesa
+                    boolean yaInscripto = InscripcionExamen.findFirst(
+                            "usuario_id = ? AND mesa_id = ?",
+                            alumnoId,
+                            mesa.getId()
+                    ) != null;
+
+                    datosMesa.put("yaInscripto", yaInscripto);
+                    mesasHabilitadas.add(datosMesa);
+                }
+            } catch (Exception e) {
+                System.err.println("Error al procesar las mesas: " + e.getMessage());
+                e.printStackTrace();
+            }
+
+            // 4. Armamos el modelo de datos para Mustache
+            Map<String, Object> viewData = new HashMap<>();
+            viewData.put("mesas", mesasHabilitadas);
+            viewData.put("username", currentUsername);
+
+            // 5. Renderizamos tu plantilla mustache
+            return new ModelAndView(viewData, "inscripcion_examenes.mustache");
+        }, new MustacheTemplateEngine());
+
         // --- Rutas GET para renderizar formularios y páginas HTML ---
 
         // GET: Muestra el formulario de creación de cuenta.
