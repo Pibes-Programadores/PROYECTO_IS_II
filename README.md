@@ -97,68 +97,93 @@ Antes de comenzar, asegurate de tener instalado:
 
 ```
 Proyecto_IS_II
-├── db
-│   ├── dev.db
-│   └── prod.db
-├── pom.xml
-├── src
-│   └── main
-│      ├── java
-│      │   └── com
-│      │       └── is1
-│      │           └── proyecto
-│      │               ├── App.java
-│      │               ├── config
-│      │               │   └── DBConfigSingleton.java
-│      │               └── models
-│      │                   ├── GestorSistema.java
-│      │                   ├── SecretariaAcademica.java
-│      │                   ├── Sesion.java
-│      │                   ├── Student.java
-│      │                   ├── Teacher.java
-│      │                   └── User.java
-│      └── resources
-│          ├── scheme.sql
-│          └── templates
-│              ├── dashboard.mustache
-│              ├── error.mustache
-│              ├── hello.mustache
-│              ├── login.mustache
-│              ├── teacher_from.mustache
-│              └── user_form.mustache
-│   
-└── target
-    ├── classes
-    │   ├── activejdbc_models.properties
-    │   ├── com
-    │   │   └── is1
-    │   │       └── proyecto
-    │   │           ├── App.class
-    │   │           ├── config
-    │   │           │   └── DBConfigSingleton.class
-    │   │           └── models
-    │   │               ├── GestorSistema.class
-    │   │               ├── SecretariaAcademica.class
-    │   │               ├── Sesion.class
-    │   │               ├── Student.class
-    │   │               ├── Teacher.class
-    │   │               └── User.class
-    │   ├── scheme.sql
-    │   └── templates
-    │       ├── dashboard.mustache
-    │       ├── error.mustache
-    │       ├── hello.mustache
-    │       ├── login.mustache
-    │       ├── teacher_from.mustache
-    │       └── user_form.mustache
-    ├── generated-sources
-    │   └── annotations
-    └── maven-status
-        └── maven-compiler-plugin
-            └── compile
-                └── default-compile
-                    ├── createdFiles.lst
-                    └── inputFiles.lst
+|-- LICENSE
+|-- META-INF
+|   `-- MANIFEST.MF
+|-- Proyecto_IS_II
+|-- db
+|   |-- dev.db
+|   `-- prod.db
+|-- dependency-reduced-pom.xml
+|-- dummy_test
+|-- pom.xml
+|-- src
+|   |-- main
+|   |   |-- java
+|   |   |   `-- com
+|   |   |       `-- is1
+|   |   |           `-- proyecto
+|   |   |               |-- App.java
+|   |   |               |-- config
+|   |   |               |   `-- DBConfigSingleton.java
+|   |   |               `-- models
+|   |   |                   |-- Anuncio.java
+|   |   |                   |-- AulaAsignacion.java
+|   |   |                   |-- Carrera.java
+|   |   |                   |-- Correlatividad.java
+|   |   |                   |-- DocenteCarrera.java
+|   |   |                   |-- DocenteMateria.java
+|   |   |                   |-- EstadoAcademico.java
+|   |   |                   |-- GestorSistema.java
+|   |   |                   |-- InscripcionExamen.java
+|   |   |                   |-- Materia.java
+|   |   |                   |-- MateriaPeriodo.java
+|   |   |                   |-- MesaExamen.java
+|   |   |                   |-- Nota.java
+|   |   |                   |-- PlanEstudio.java
+|   |   |                   |-- SecretariaAcademica.java
+|   |   |                   |-- Sesion.java
+|   |   |                   |-- Student.java
+|   |   |                   |-- Teacher.java
+|   |   |                   `-- User.java
+|   |   `-- resources
+|   |       |-- activejdbc_models.properties
+|   |       |-- scheme.sql
+|   |       `-- templates
+|   |           |-- assign_materia_form.mustache
+|   |           |-- carrera_form.mustache
+|   |           |-- contenido_proximamente.mustache
+|   |           |-- dashboard.mustache
+|   |           |-- docente_materias.mustache
+|   |           |-- docente_panel_materia.mustache
+|   |           |-- error.mustache
+|   |           |-- hello.mustache
+|   |           |-- inscripcion_examenes.mustache
+|   |           |-- inscripcion_materias.mustache
+|   |           |-- login.mustache
+|   |           |-- materia_form.mustache
+|   |           |-- materias_list.mustache
+|   |           |-- secretariaAcademica_form.mustache
+|   |           |-- student_form.mustache
+|   |           `-- teacher_from.mustache
+|   `-- test
+|       `-- java
+|           `-- com
+|               `-- is1
+|                   `-- proyecto
+|                       `-- AppTest.java
+`-- target
+    |-- classes
+    |   |-- activejdbc_models.properties
+    |   |-- scheme.sql
+    |   `-- templates
+    |       |-- dashboard.mustache
+    |       |-- inscripcion_examenes.mustache
+    |       |-- inscripcion_materias.mustache
+    |       `-- student_form.mustache
+    |-- maven-archiver
+    |   `-- pom.properties
+    `-- maven-status
+        `-- maven-compiler-plugin
+            |-- compile
+            |   `-- default-compile
+            |       |-- createdFiles.lst
+            |       `-- inputFiles.lst
+            `-- testCompile
+                `-- default-testCompile
+                    |-- createdFiles.lst
+                    `-- inputFiles.lst
+
 ```
 
 ---
