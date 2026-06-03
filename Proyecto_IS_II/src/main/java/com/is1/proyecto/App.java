@@ -542,15 +542,17 @@ public class App {
                 }
 
                 // Tarea A: Guardar Materia con PK numérica
-                Materia m = new Materia();
-                m.set("codigo", codigoNumerico); // Se inserta como Integer
-                m.set("plan_estudio_id", Integer.parseInt(planEstudioId));
-                m.set("nombre", nombre);
-                m.set("anio_cursada", anioPropuestoMateria);
                 if (cargaHorariaTotal != null && !cargaHorariaTotal.isBlank()) {
-                    m.set("carga_horaria_total", Integer.parseInt(cargaHorariaTotal));
+                    Base.exec(
+                        "INSERT INTO Materia (codigo, plan_estudio_id, nombre, anio_cursada, carga_horaria_total) VALUES (?, ?, ?, ?, ?)",
+                        codigoNumerico, Integer.parseInt(planEstudioId), nombre, anioPropuestoMateria, Integer.parseInt(cargaHorariaTotal)
+                    );
+                } else {
+                    Base.exec(
+                        "INSERT INTO Materia (codigo, plan_estudio_id, nombre, anio_cursada) VALUES (?, ?, ?, ?)",
+                        codigoNumerico, Integer.parseInt(planEstudioId), nombre, anioPropuestoMateria
+                    );
                 }
-                m.saveIt();
 
                 // Tarea B: Guardar Periodo
                 int anioActualDinamico = java.time.Year.now().getValue();
