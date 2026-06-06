@@ -19,6 +19,7 @@ import com.is1.proyecto.models.Correlatividad;
 import com.is1.proyecto.models.DocenteMateria;
 import com.is1.proyecto.models.MesaExamen;
 import com.is1.proyecto.models.InscripcionExamen;
+import com.is1.proyecto.models.EstadoAcademico;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -1316,6 +1317,34 @@ get("/docente/materia/:materiaId", (req, res) -> {
     model.put("periodoMateria", periodoLabel);
     model.put("alumnos",       alumnosOptions);
 
+
+    List<Map<String, Object>> anuncios = new ArrayList<>();
+    if (periodo != null) {
+        List<Map> anunciosDB = Base.findAll(
+                "SELECT id, tipo, titulo, contenido, fecha_examen FROM Anuncio WHERE materia_periodo_id = ? ORDER BY fecha_creacion DESC",
+                periodo.getId()
+        );
+        for (Map a : anunciosDB) {
+            Map<String, Object> anuncioMap = new HashMap<>();
+            anuncioMap.put("id",          a.get("id"));
+            anuncioMap.put("tipo",        a.get("tipo"));
+            anuncioMap.put("titulo",      a.get("titulo"));
+            anuncioMap.put("contenido",   a.get("contenido"));
+            anuncioMap.put("fechaExamen", a.get("fecha_examen"));
+            anuncioMap.put("esExamen",    "EXAMEN".equals(a.get("tipo")));
+            if ("EXAMEN".equals(a.get("tipo"))) {
+                List<Map> conteoRows = Base.findAll(
+                        "SELECT COUNT(*) AS total FROM Inscripcion_Parcial WHERE anuncio_id = ?",
+                        ((Number) a.get("id")).intValue()
+                );
+                int total = conteoRows.isEmpty() ? 0 : ((Number) conteoRows.get(0).get("total")).intValue();
+                anuncioMap.put("inscriptosCount", total);
+            }
+            anuncios.add(anuncioMap);
+        }
+    }
+    model.put("anuncios", anuncios);
+
     String successMessage = req.queryParams("message");
     String errorMessage   = req.queryParams("error");
     if (successMessage != null && !successMessage.isEmpty()) model.put("successMessage", successMessage);
@@ -1418,25 +1447,38 @@ post("/docente/materia/:materiaId/nota", (req, res) -> {
         return "";
     }
 
+    String estadoCursada = req.queryParams("estado_cursada");
+    if (estadoCursada == null || estadoCursada.isEmpty()) estadoCursada = "REGULAR";
+
     try {
         int    studentId = Integer.parseInt(studentIdParam);
         double valor     = Double.parseDouble(valorParam);
 
         if (valor < 0 || valor > 10) throw new IllegalArgumentException("La nota debe estar entre 0 y 10.");
 
+        // Guardar la nota con instancia CURSADA
         Nota nota = new Nota();
         nota.set("materia_periodo_id", mp.getId());
         nota.set("student_id",         studentId);
         nota.set("teacher_id",         teacherId);
         nota.set("valor",              valor);
+        nota.set("instancia",          "CURSADA");
         nota.saveIt();
 
+        // si promociona, lo guarda como aprobado
+        String estadoFinal = "PROMOCION".equals(estadoCursada) ? "PROMOCION" : estadoCursada;
+        Base.exec(
+                "INSERT INTO Estado_Academico (usuario_id, materia_codigo, estado) VALUES (?, ?, ?) " +
+                        "ON DUPLICATE KEY UPDATE estado = VALUES(estado)",
+                studentId, materiaId, estadoFinal
+        );
+
         res.redirect("/docente/materia/" + materiaId + "?message=" + URLEncoder.encode(
-            "Nota registrada correctamente.", StandardCharsets.UTF_8.toString()));
+                "Nota y estado de cursada registrados correctamente.", StandardCharsets.UTF_8.toString()));
     } catch (Exception e) {
         e.printStackTrace();
         res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
-            "Error al registrar la nota: " + e.getMessage(), StandardCharsets.UTF_8.toString()));
+                "Error al registrar la nota: " + e.getMessage(), StandardCharsets.UTF_8.toString()));
     }
     return "";
 });
