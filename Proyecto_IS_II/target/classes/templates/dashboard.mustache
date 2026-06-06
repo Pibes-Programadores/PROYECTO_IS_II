@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Bienvenido</title>
+    <title>SiGU - Bienvenido</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] flex items-center justify-center min-h-screen p-4">
@@ -90,13 +90,7 @@
                 <a href="/carrera/materias" class="inline-block bg-zinc-800 text-white py-2 px-4 rounded-md hover:bg-zinc-900 transition duration-300">Ver Grilla</a>
             </div>
 
-            <div class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-lg w-full max-w-2xl">
-                <h2 class="text-2xl font-bold text-blue-400 mb-3">Mesas de Examen</h2>
-                <p class="text-gray-50 mb-4">Inscribite a los llamados de exámenes finales disponibles para tu condición académica.</p>
-                <a href="/estudiante/inscripcion/examen" class="inline-block bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition duration-300">Inscribirse</a>
-            </div>
         {{#isEstudiante}}
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <div class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-lg w-full max-w-2xl">
                 <h2 class="text-2xl font-bold text-green-400 mb-3">Inscripción a Materias</h2>
                 <p class="text-gray-50 mb-4">Inscribite en las materias habilitadas para cursar según tu plan de estudios.</p>
@@ -108,9 +102,9 @@
                 <p class="text-gray-50 mb-4">Anotate para rendir exámenes finales en las materias que tenés regulares o libres.</p>
                 <a href="/estudiante/inscripcion/examen" class="inline-block bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition duration-300">Inscribir Exámenes</a>
             </div>
-        </div>
-        {{/isEstudiante}}
-        <div class="text-center mt-6">
+            {{/isEstudiante}}
+
+        </div> <div class="text-center mt-6">
             <a href="/logout" class="inline-block bg-red-600 text-white py-2 px-6 rounded-md hover:bg-red-700 transition duration-300 text-lg">Cerrar Sesión</a>
         </div>
     </div>
