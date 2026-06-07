@@ -97,3 +97,8 @@ INSERT INTO Estado_Academico (usuario_id, materia_codigo, estado) VALUES
 (2, 202, 'INSCRIPTO'),
 (3, 101, 'REGULAR'),
 (4, 101, 'LIBRE');
+
+-- Inscribir en primer parcial DB
+INSERT INTO Inscripcion_Parcial (usuario_id, anuncio_id) VALUES
+(2, 2),
+(3, 2);

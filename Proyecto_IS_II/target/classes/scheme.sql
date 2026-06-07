@@ -190,6 +190,7 @@ CREATE TABLE Nota (
     teacher_id INT NOT NULL,
     valor DECIMAL(5,2) NOT NULL,
     fecha_carga DATETIME DEFAULT CURRENT_TIMESTAMP,
+    instancia ENUM('PARCIAL', 'CURSADA', 'FINAL') NOT NULL DEFAULT 'CURSADA',
     FOREIGN KEY (materia_periodo_id) REFERENCES Materia_Periodo(id) ON DELETE CASCADE,
     FOREIGN KEY (student_id) REFERENCES student(usuario_id) ON DELETE CASCADE,
     FOREIGN KEY (teacher_id) REFERENCES teacher(usuario_id) ON DELETE CASCADE
@@ -227,11 +228,21 @@ CREATE TABLE Estado_Academico (
     id INT AUTO_INCREMENT PRIMARY KEY,
     usuario_id INT NOT NULL,
     materia_codigo INT NOT NULL,
-    estado ENUM('INSCRIPTO', 'REGULAR', 'APROBADO', 'REPROBADO', 'LIBRE') NOT NULL,
+    estado ENUM('INSCRIPTO', 'REGULAR', 'APROBADO', 'REPROBADO', 'LIBRE', 'PROMOCION') NOT NULL,
     fecha_actualizacion DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_estado_estudiante FOREIGN KEY (usuario_id) REFERENCES student(usuario_id) ON DELETE CASCADE,
     CONSTRAINT fk_estado_materia FOREIGN KEY (materia_codigo) REFERENCES Materia(codigo) ON DELETE CASCADE,
     UNIQUE KEY unique_estudiante_materia (usuario_id, materia_codigo)
+) ENGINE=InnoDB;
+
+CREATE TABLE Inscripcion_Parcial (
+	id INT AUTO_INCREMENT NOT NULL PRIMARY KEY,
+	usuario_id INT NOT NULL,
+	anuncio_id INT NOT NULL,
+    fecha_inscripcion DATETIME DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_ip_usuario FOREIGN KEY (usuario_id) REFERENCES student(usuario_id) ON DELETE CASCADE,
+    CONSTRAINT fk_ip_anuncio FOREIGN KEY (anuncio_id) REFERENCES anuncio(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_estudiante_parcial (usuario_id, anuncio_id)
 ) ENGINE=InnoDB;
 
 INSERT IGNORE INTO users (dni, nombre, apellido, nombre_usuario, password, nivel_acceso) 
