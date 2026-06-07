@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Aula Virtual - Seleccionar Materia</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] min-h-screen p-6 flex flex-col items-center justify-center">
+    <div class="w-full max-w-2xl bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-xl border border-purple-900/30">
+        <h1 class="text-3xl font-bold text-center text-white mb-6">Mis Aulas Virtuales</h1>
+        <p class="text-gray-300 text-center mb-6">Selecciona una materia a la que estés inscripto o hayas aprobado para ver sus novedades.</p>
+
+        <form action="/estudiante/aula-virtual/materia" method="get" class="space-y-4">
+            <div>
+                <label for="materia_codigo" class="block text-[#ccd0fc] text-sm font-medium mb-1">Materia:</label>
+                <select id="materia_codigo" name="materia_codigo" required class="w-full px-4 py-2 border rounded-md bg-white text-gray-900 focus:ring-2 focus:ring-purple-500">
+                    <option value="">-- Seleccionar Materia --</option>
+                    {{#materias}}
+                    <option value="{{codigo}}">[{{codigo}}] {{nombre}} (Estado: {{estado}})</option>
+                    {{/materias}}
+                </select>
+                {{^materias}}
+                <p class="text-red-400 text-sm mt-2">No estás inscripto en ninguna materia actualmente.</p>
+                {{/materias}}
+            </div>
+            
+            <button type="submit" class="w-full bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 transition duration-300">
+                Ingresar al Aula
+            </button>
+        </form>
+
+        <div class="text-center mt-6">
+            <a href="/dashboard" class="text-purple-300 hover:text-white transition-colors duration-200">Volver al Panel</a>
+        </div>
+    </div>
+</body>
+</html>

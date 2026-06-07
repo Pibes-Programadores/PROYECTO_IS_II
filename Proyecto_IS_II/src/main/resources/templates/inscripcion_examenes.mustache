@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>SiGU - Inscripción a Exámenes Finales</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] flex items-center justify-center min-h-screen p-4">
+    <div class="w-full bg-[#190019]/90 p-8 rounded-lg shadow-lg w-full max-w-4xl border border-[#ccd0fc]/20">
+        <h1 class="text-3xl font-bold text-center text-[#ccd0fc] mb-2">Mesas de Examen Disponibles</h1>
+        <p class="text-center text-[#ccd0fc]/70 text-sm mb-6">Aquí aparecen únicamente las materias en condición REGULAR o LIBRE con sus correlatividades de examen aprobadas.</p>
+
+        <div id="alertas" class="mb-4"></div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-white">
+                <thead>
+                    <tr class="border-b border-[#ccd0fc]/30 text-[#ccd0fc]">
+                        <th class="py-3 px-4 font-semibold text-sm">Código de Materia</th>
+                        <th class="py-3 px-4 font-semibold text-sm">Fecha del Llamado</th>
+                        <th class="py-3 px-4 font-semibold text-sm text-center">Acción</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-[#ccd0fc]/10">
+                    {{#mesas}}
+                    <tr class="hover:bg-white/5 transition-colors">
+                        <td class="py-4 px-4 font-medium text-lg text-[#ccd0fc]">{{materia_codigo}}</td>
+                        <td class="py-4 px-4 text-gray-300">{{fecha}}</td>
+                        <td class="py-4 px-4 text-center">
+                            <form action="/estudiante/inscripcion/examen" method="POST" class="m-0">
+                                <input type="hidden" name="mesa_id" value="{{id}}">
+                                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-1.5 px-4 rounded transition-colors text-sm shadow">
+                                    Inscribirse
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {{/mesas}}
+                    {{^mesas}}
+                    <tr>
+                        <td colspan="3" class="text-center text-[#ccd0fc]/50 py-8 text-sm italic">
+                            No tenés mesas de examen disponibles que cumplan con tus requisitos académicos actuales.
+                        </td>
+                    </tr>
+                    {{/mesas}}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mt-8 pt-6 border-t border-[#ccd0fc]/20 flex justify-center">
+            <a href="/dashboard" class="text-[#ccd0fc] hover:text-white transition-colors text-sm flex items-center gap-2">
+                ← Volver al panel principal
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // Script simple para leer las alertas que manda el backend en la URL (?success=... o ?error=...)
+        const urlParams = new URLSearchParams(window.location.search);
+        const alertasDiv = document.getElementById('alertas');
+        if(urlParams.has('success')) {
+            alertasDiv.innerHTML = `<div class="bg-green-900/80 border border-green-500 text-green-200 px-4 py-3 rounded text-sm">${urlParams.get('success')}</div>`;
+        } else if(urlParams.has('error')) {
+            alertasDiv.innerHTML = `<div class="bg-red-900/80 border border-red-500 text-red-200 px-4 py-3 rounded text-sm">${urlParams.get('error')}</div>`;
+        }
+    </script>
+</body>
+</html>

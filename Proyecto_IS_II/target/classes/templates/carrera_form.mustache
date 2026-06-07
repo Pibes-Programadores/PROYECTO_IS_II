@@ -1,0 +1,68 @@
+_<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>SiGU - Cargar Carrera y Plan de Estudio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] flex items-center justify-center min-h-screen p-4">
+    <div class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-lg w-full max-w-2xl">
+        <h1 class="text-3xl font-bold text-center text-purple-400 mb-6">Alta de Carrera y Plan de Estudio</h1>
+
+        {{#successMessage}}
+        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4">
+            <span class="block sm:inline">{{successMessage}}</span>
+        </div>
+        {{/successMessage}}
+
+        {{#errorMessage}}
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+            <span class="block sm:inline">{{errorMessage}}</span>
+        </div>
+        {{/errorMessage}}
+
+        <form action="/carrera/new" method="post" class="space-y-4">
+            
+            <h2 class="text-xl font-semibold text-[#ccd0fc] border-b border-purple-500 pb-1">1. Información de la Carrera</h2>
+            <div>
+                <label for="nombre" class="block text-[#ccd0fc] text-sm font-medium mb-1">Nombre Completo de la Carrera:</label>
+                <input type="text" id="nombre" name="nombre" required class="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-purple-500 text-gray-900">
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label for="duracion_anios" class="block text-[#ccd0fc] text-sm font-medium mb-1">Duración (en años):</label>
+                    <input type="number" id="duracion_anios" name="duracion_anios" min="1" max="10" required class="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-purple-500 text-gray-900">
+                </div>
+                <div>
+                    <label for="titulo_otorgado" class="block text-[#ccd0fc] text-sm font-medium mb-1">Título Otorgado:</label>
+                    <input type="text" id="titulo_otorgado" name="titulo_otorgado" required class="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-purple-500 text-gray-900">
+                </div>
+            </div>
+
+            <h2 class="text-xl font-semibold text-[#ccd0fc] border-b border-purple-500 pb-1 pt-4">2. Plan de Estudio Inicial</h2>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label for="anio_resolucion" class="block text-[#ccd0fc] text-sm font-medium mb-1">Año de Resolución:</label>
+                    <input type="number" id="anio_resolucion" name="anio_resolucion" min="1900" max="2100" required class="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-purple-500 text-gray-900">
+                </div>
+                <div>
+                    <label for="estado" class="block text-[#ccd0fc] text-sm font-medium mb-1">Estado Inicial:</label>
+                    <select id="estado" name="estado" required class="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-purple-500 bg-white text-gray-900">
+                        <option value="VIGENTE">Vigente</option>
+                        <option value="OBSOLETO">Obsoleto</option>
+                    </select>
+                </div>
+            </div>
+
+            <button type="submit" class="w-full bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 transition duration-300 mt-6">
+                Guardar Carrera y Vincular Plan
+            </button>
+            
+            <div class="text-center mt-4">
+                <a href="/dashboard" class="text-purple-400 hover:underline text-sm">← Volver al panel principal</a>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

@@ -97,36 +97,80 @@ Antes de comenzar, asegurate de tener instalado:
 
 ```
 Proyecto_IS_II
+.
 ├── db
 │   ├── dev.db
 │   └── prod.db
+├── dependency-reduced-pom.xml
+├── dummy_test
+├── LICENSE
+├── META-INF
+│   └── MANIFEST.MF
 ├── pom.xml
+├── Proyecto_IS_II
 ├── src
-│   └── main
-│      ├── java
-│      │   └── com
-│      │       └── is1
-│      │           └── proyecto
-│      │               ├── App.java
-│      │               ├── config
-│      │               │   └── DBConfigSingleton.java
-│      │               └── models
-│      │                   ├── GestorSistema.java
-│      │                   ├── SecretariaAcademica.java
-│      │                   ├── Sesion.java
-│      │                   ├── Student.java
-│      │                   ├── Teacher.java
-│      │                   └── User.java
-│      └── resources
-│          ├── scheme.sql
-│          └── templates
-│              ├── dashboard.mustache
-│              ├── error.mustache
-│              ├── hello.mustache
-│              ├── login.mustache
-│              ├── teacher_from.mustache
-│              └── user_form.mustache
-│   
+│   ├── main
+│   │   ├── java
+│   │   │   └── com
+│   │   │       └── is1
+│   │   │           └── proyecto
+│   │   │               ├── App.java
+│   │   │               ├── config
+│   │   │               │   └── DBConfigSingleton.java
+│   │   │               └── models
+│   │   │                   ├── Anuncio.java
+│   │   │                   ├── AulaAsignacion.java
+│   │   │                   ├── Carrera.java
+│   │   │                   ├── Correlatividad.java
+│   │   │                   ├── DocenteCarrera.java
+│   │   │                   ├── DocenteMateria.java
+│   │   │                   ├── EstadoAcademico.java
+│   │   │                   ├── GestorSistema.java
+│   │   │                   ├── InscripcionExamen.java
+│   │   │                   ├── Materia.java
+│   │   │                   ├── MateriaPeriodo.java
+│   │   │                   ├── MesaExamen.java
+│   │   │                   ├── Nota.java
+│   │   │                   ├── PlanEstudio.java
+│   │   │                   ├── SecretariaAcademica.java
+│   │   │                   ├── Sesion.java
+│   │   │                   ├── Student.java
+│   │   │                   ├── Teacher.java
+│   │   │                   └── User.java
+│   │   └── resources
+│   │       ├── activejdbc_models.properties
+│   │       ├── inicializar_db.sql
+│   │       ├── scheme.sql
+│   │       └── templates
+│   │           ├── assign_materia_form.mustache
+│   │           ├── aula_virtual.mustache
+│   │           ├── aula_virtual_selector.mustache
+│   │           ├── aula_virtual_tablero.mustache
+│   │           ├── carga_finales_acta.mustache
+│   │           ├── carga_finales.mustache
+│   │           ├── carrera_form.mustache
+│   │           ├── contenido_proximamente.mustache
+│   │           ├── dashboard.mustache
+│   │           ├── docente_materias.mustache
+│   │           ├── docente_panel_materia.mustache
+│   │           ├── error.mustache
+│   │           ├── hello.mustache
+│   │           ├── historia_academica.mustache
+│   │           ├── inscripcion_examenes.mustache
+│   │           ├── inscripcion_materias.mustache
+│   │           ├── login.mustache
+│   │           ├── materia_form.mustache
+│   │           ├── materias_list.mustache
+│   │           ├── secretariaAcademica_form.mustache
+│   │           ├── student_form.mustache
+│   │           ├── teacher_from.mustache
+│   │           └── user_form.mustache
+│   └── test
+│       └── java
+│           └── com
+│               └── is1
+│                   └── proyecto
+│                       └── AppTest.java
 └── target
     ├── classes
     │   ├── activejdbc_models.properties
@@ -137,18 +181,49 @@ Proyecto_IS_II
     │   │           ├── config
     │   │           │   └── DBConfigSingleton.class
     │   │           └── models
+    │   │               ├── Anuncio.class
+    │   │               ├── AulaAsignacion.class
+    │   │               ├── Carrera.class
+    │   │               ├── Correlatividad.class
+    │   │               ├── DocenteCarrera.class
+    │   │               ├── DocenteMateria.class
+    │   │               ├── EstadoAcademico.class
     │   │               ├── GestorSistema.class
+    │   │               ├── InscripcionExamen.class
+    │   │               ├── Materia.class
+    │   │               ├── MateriaPeriodo.class
+    │   │               ├── MesaExamen.class
+    │   │               ├── Nota.class
+    │   │               ├── PlanEstudio.class
     │   │               ├── SecretariaAcademica.class
     │   │               ├── Sesion.class
     │   │               ├── Student.class
     │   │               ├── Teacher.class
     │   │               └── User.class
+    │   ├── inicializar_db.sql
     │   ├── scheme.sql
     │   └── templates
+    │       ├── assign_materia_form.mustache
+    │       ├── aula_virtual.mustache
+    │       ├── aula_virtual_selector.mustache
+    │       ├── aula_virtual_tablero.mustache
+    │       ├── carga_finales_acta.mustache
+    │       ├── carga_finales.mustache
+    │       ├── carrera_form.mustache
+    │       ├── contenido_proximamente.mustache
     │       ├── dashboard.mustache
+    │       ├── docente_materias.mustache
+    │       ├── docente_panel_materia.mustache
     │       ├── error.mustache
     │       ├── hello.mustache
+    │       ├── historia_academica.mustache
+    │       ├── inscripcion_examenes.mustache
+    │       ├── inscripcion_materias.mustache
     │       ├── login.mustache
+    │       ├── materia_form.mustache
+    │       ├── materias_list.mustache
+    │       ├── secretariaAcademica_form.mustache
+    │       ├── student_form.mustache
     │       ├── teacher_from.mustache
     │       └── user_form.mustache
     ├── generated-sources
@@ -162,4 +237,3 @@ Proyecto_IS_II
 ```
 
 ---
-
