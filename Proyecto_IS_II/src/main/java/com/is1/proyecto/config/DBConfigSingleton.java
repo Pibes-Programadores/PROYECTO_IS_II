@@ -39,11 +39,7 @@ public final class DBConfigSingleton {
         }
     }
 
-<<<<<<< HEAD
-    public void closeConnection() {
-=======
     public void closeConnection(){
->>>>>>> luka
         if (Base.hasConnection()) {
             Base.close();
         }

@@ -4,19 +4,6 @@ import static spark.Spark.*; // Importa los métodos estáticos principales de S
 
 // Importaciones necesarias para la aplicación Spark
 import com.fasterxml.jackson.databind.ObjectMapper; // Utilidad para serializar/deserializar objetos Java a/desde JSON.
-<<<<<<< HEAD
-// Importaciones de clases del proyecto
-import com.is1.proyecto.config.DBConfigSingleton; // Clase Singleton para la configuración de la base de datos.
-// Importaciones específicas para ActiveJDBC (ORM para la base de datos)
-import com.is1.proyecto.models.Teacher;
-import com.is1.proyecto.models.User; // Modelo de ActiveJDBC que representa la tabla 'users'.
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-// Importaciones estándar de Java
-import java.util.HashMap; // Para crear mapas de datos (modelos para las plantillas).
-import java.util.Map; // Interfaz Map, utilizada para Map.of() o HashMap.
-import org.javalite.activejdbc.Base; // Clase central de ActiveJDBC para gestionar la conexión a la base de datos.
-=======
 import com.is1.proyecto.config.DBConfigSingleton; // Clase Singleton para la configuración de la base de datos.
 // Importaciones de clases del proyecto
 import com.is1.proyecto.models.Anuncio;
@@ -48,7 +35,6 @@ import java.util.List;
 import java.util.Map; // Interfaz Map, utilizada para Map.of() o HashMap.
 import org.javalite.activejdbc.Base; // Clase central de ActiveJDBC para gestionar la conexión a la base de datos.
 import org.javalite.activejdbc.Model;
->>>>>>> luka
 import org.mindrot.jbcrypt.BCrypt; // Utilidad para hashear y verificar contraseñas de forma segura.
 // Importaciones de Spark para renderizado de plantillas
 import spark.ModelAndView; // Representa un modelo de datos y el nombre de la vista a renderizar.
@@ -99,45 +85,15 @@ public class App {
             }
         });
 
-<<<<<<< HEAD
-=======
 
->>>>>>> luka
         // --- Rutas GET para renderizar formularios y páginas HTML ---
 
         // GET: Muestra el formulario de creación de cuenta.
         // Soporta la visualización de mensajes de éxito o error pasados como query parameters.
-<<<<<<< HEAD
-        get(
-            "/user/create",
-            (req, res) -> {
-                Map<String, Object> model = new HashMap<>(); // Crea un mapa para pasar datos a la plantilla.
-
-                // Obtener y añadir mensaje de éxito de los query parameters (ej. ?message=Cuenta creada!)
-                String successMessage = req.queryParams("message");
-                if (successMessage != null && !successMessage.isEmpty()) {
-                    model.put("successMessage", successMessage);
-                }
-
-                // Obtener y añadir mensaje de error de los query parameters (ej. ?error=Campos vacíos)
-                String errorMessage = req.queryParams("error");
-                if (errorMessage != null && !errorMessage.isEmpty()) {
-                    model.put("errorMessage", errorMessage);
-                }
-
-                // Renderiza la plantilla 'user_form.mustache' con los datos del modelo.
-                return new ModelAndView(model, "user_form.mustache");
-            },
-            new MustacheTemplateEngine()
-        ); // Especifica el motor de plantillas para esta ruta.
-=======
->>>>>>> luka
 
         // GET: Ruta para mostrar el dashboard (panel de control) del usuario.
         // Requiere que el usuario esté autenticado.
         get(
-<<<<<<< HEAD
-=======
             "/login",
             (req, res) -> {
                 Map<String, Object> model = new HashMap<>();
@@ -155,7 +111,6 @@ public class App {
         );
 
         get(
->>>>>>> luka
             "/dashboard",
             (req, res) -> {
                 Map<String, Object> model = new HashMap<>();
@@ -178,8 +133,6 @@ public class App {
                 // 3. Pasamos los datos a la vista (Mustache)
                 model.put("username", currentUsername);
 
-<<<<<<< HEAD
-=======
                 String errorMessage = req.queryParams("error");
                 if (errorMessage != null && !errorMessage.isEmpty()) {
                     model.put("errorMessage", errorMessage);
@@ -189,17 +142,13 @@ public class App {
                     model.put("successMessage", successMessage);
                 }
 
->>>>>>> luka
                 // Creamos "banderas" (true/false) para que el HTML decida qué mostrar
                 model.put(
                     "isAdmin",
                     "ADMIN".equals(userRole) || "SECRETARIA".equals(userRole)
                 );
                 model.put("isDocente", "DOCENTE".equals(userRole));
-<<<<<<< HEAD
-=======
                 model.put("isEstudiante", "ESTUDIANTE".equals(userRole));
->>>>>>> luka
 
                 return new ModelAndView(model, "dashboard.mustache");
             },
@@ -207,26 +156,6 @@ public class App {
         );
 
         // GET: Ruta para MOSTRAR el formulario de carga de docente
-<<<<<<< HEAD
-        get(
-            "/teacher/new",
-            (req, res) -> {
-                // Constructor de model
-                Map<String, Object> model = new HashMap<>();
-
-                // REVISAMOS SI HAY MENSAJES EN LA URL
-                // Si vienes redirigido de un éxito, la URL será: /teacher/new?message=...
-                String successMessage = req.queryParams("message");
-
-                // Si vienes redirigido de un fallo, la URL será: /teacher/new?error=...
-                String errorMessage = req.queryParams("error");
-
-                // Si existen, los metemos en la cajita (modelo)
-                if (successMessage != null && !successMessage.isEmpty()) {
-                    model.put("successMessage", successMessage);
-                }
-
-=======
         // modifiqué para que ande bien lo de asignar docentes
         get(
             "/teacher/new",
@@ -239,27 +168,20 @@ public class App {
                 if (successMessage != null && !successMessage.isEmpty()) {
                     model.put("successMessage", successMessage);
                 }
->>>>>>> luka
                 if (errorMessage != null && !errorMessage.isEmpty()) {
                     model.put("errorMessage", errorMessage);
                 }
 
-<<<<<<< HEAD
-                // Renderizamos la vista.
-=======
                 List<Map> carreras = Base.findAll(
                     "SELECT id, nombre FROM Carrera ORDER BY nombre ASC"
                 );
                 model.put("carreras", carreras);
 
->>>>>>> luka
                 return new ModelAndView(model, "teacher_from.mustache");
             },
             new MustacheTemplateEngine()
         );
 
-<<<<<<< HEAD
-=======
         get(
             "/teacher/assign-materia",
             (req, res) -> {
@@ -425,7 +347,6 @@ public class App {
             }
         });
 
->>>>>>> luka
         // Importar el modelo Teacher al inicio del archivo si no está:
         // import com.is1.proyecto.models.Teacher;
 
@@ -467,29 +388,6 @@ public class App {
         // GET: Ruta de alias para el formulario de creación de cuenta.
         // En una aplicación real, probablemente querrías unificar con '/user/create' para evitar duplicidad.
         // POST: Maneja el envío del formulario de creación de nueva cuenta.
-<<<<<<< HEAD
-
-        post("/user/new", (req, res) -> {
-            String name = req.queryParams("name");
-            String password = req.queryParams("password");
-            String role = req.queryParams("role"); // Captura el valor del selector
-
-            // Validaciones básicas incluyendo el rol
-            if (
-                name == null ||
-                name.isEmpty() ||
-                password == null ||
-                password.isEmpty() ||
-                role == null ||
-                role.isEmpty()
-            ) {
-                res.status(400);
-                String errorMsg = URLEncoder.encode(
-                    "Todos los campos (Nombre, Contraseña y Rol) son obligatorios.",
-                    StandardCharsets.UTF_8.toString()
-                );
-                res.redirect("/user/create?error=" + errorMsg);
-=======
         // ==========================================
         // GESTIÓN DE ESTUDIANTES
         // ==========================================
@@ -567,54 +465,10 @@ public class App {
                     StandardCharsets.UTF_8.toString()
                 );
                 res.redirect("/student/new?error=" + errorMsg);
->>>>>>> luka
                 return "";
             }
 
             try {
-<<<<<<< HEAD
-                User u = new User();
-                String hashedPassword = BCrypt.hashpw(
-                    password,
-                    BCrypt.gensalt()
-                );
-
-                u.set("nombre", name);
-                u.set("apellido", "Pendiente");
-                u.set(
-                    "dni",
-                    String.valueOf(System.currentTimeMillis()).substring(5)
-                ); // DNI temporal
-                u.set("nombre_usuario", name);
-                u.set("nivel_acceso", role); // Guardamos el rol elegido
-                u.set("password", hashedPassword);
-
-                u.saveIt();
-
-                res.status(201);
-                // Codificamos el mensaje de éxito para evitar el error de UTF-8
-                String successMsg = URLEncoder.encode(
-                    "Cuenta creada exitosamente para " +
-                        name +
-                        " (Rol: " +
-                        role +
-                        ")",
-                    StandardCharsets.UTF_8.toString()
-                );
-                res.redirect("/user/create?message=" + successMsg);
-                return "";
-            } catch (Exception e) {
-                System.err.println(
-                    "Error al registrar la cuenta: " + e.getMessage()
-                );
-                e.printStackTrace();
-                res.status(500);
-                String errorMsg = URLEncoder.encode(
-                    "Error interno al crear la cuenta. Intente de nuevo.",
-                    StandardCharsets.UTF_8.toString()
-                );
-                res.redirect("/user/create?error=" + errorMsg);
-=======
                 Base.openTransaction();
 
                 // 2. Guardamos el Usuario base
@@ -654,24 +508,10 @@ public class App {
                             StandardCharsets.UTF_8.toString()
                         )
                 );
->>>>>>> luka
                 return "";
             }
         });
 
-<<<<<<< HEAD
-        /*
-        // POST: Creación de Docente (Relación con la tabla 'users')
-        post("/teacher/new", (req, res) -> {
-            // 1. Capturamos los datos que vienen del formulario
-            String name = req.queryParams("teacher_name");
-            String lastName = req.queryParams("teacher_lastname");
-            String dniStr = req.queryParams("teacher_dni");
-            String titulo = req.queryParams("titulo");
-
-            if (name == null || lastName == null || dniStr == null) {
-                res.redirect("/teacher/new?error=Los campos Nombre, Apellido y DNI son obligatorios.");
-=======
         // ====================================================
         // AULA VIRTUAL (ESTUDIANTE) - SELECTOR
         // ====================================================
@@ -1110,43 +950,10 @@ public class App {
                     StandardCharsets.UTF_8.toString()
                 );
                 res.redirect("/secretariaAcademica/new?error=" + errorMsg);
->>>>>>> luka
                 return "";
             }
 
             try {
-<<<<<<< HEAD
-             // 3. CREAMOS EL USUARIO BASE
-                User u = new User();
-                u.set("nombre", name);
-                u.set("apellido", lastName);
-                u.set("dni", dniStr);
-                u.set("email", name.toLowerCase() + "." + lastName.toLowerCase() + "@unrc.edu.ar");
-                u.set("nivel_acceso", "DOCENTE");
-                u.set("password", "1234");
-                u.saveIt();
-
-                // 4. CREAMOS EL DOCENTE
-                Teacher t = new Teacher();
-                t.set("usuario_id", u.getId());
-                t.set("cuil", "20-" + dniStr + "-9");
-
-                // Si el formulario HTML no tiene input para "titulo", ponemos uno por defecto
-                t.set("titulo", (titulo != null && !titulo.isEmpty()) ? titulo : "Docente");
-                t.saveIt();
-
-                res.redirect("/teacher/new?message=Profesor " + name + " " + lastName + " registrado correctamente.");
-                return "";
-
-            } catch (Exception e) {
-                System.err.println("Error al crear docente: " + e.getMessage());
-                e.printStackTrace();
-                res.redirect("/teacher/new?error=Error interno al guardar el profesor.");
-                return "";
-            }
-        });
-        */
-=======
                 // 2. Guardamos el Usuario base
                 User u = new User();
                 u.set("nombre", name, "apellido", lastName, "dni", dni);
@@ -1729,7 +1536,6 @@ public class App {
             },
             new MustacheTemplateEngine()
         );
->>>>>>> luka
 
         post("/teacher/new", (req, res) -> {
             String name = req.queryParams("teacher_name");
@@ -1741,12 +1547,6 @@ public class App {
             String cuil = req.queryParams("teacher_cuil");
             String email = req.queryParams("teacher_email");
             String especialidad = req.queryParams("especialidad");
-<<<<<<< HEAD
-
-            if (name == null || lastName == null || dni == null) {
-                res.redirect(
-                    "/teacher/new?error=Los campos Nombre, Apellido y DNI son obligatorios."
-=======
             String carreraId = req.queryParams("carrera_id");
 
             if (
@@ -1758,7 +1558,6 @@ public class App {
             ) {
                 res.redirect(
                     "/teacher/new?error=Los campos Nombre, Apellido, DNI y Carrera son obligatorios."
->>>>>>> luka
                 );
                 return "";
             }
@@ -1784,14 +1583,11 @@ public class App {
                 t.set("email", email, "especialidad", especialidad);
                 t.saveIt();
 
-<<<<<<< HEAD
-=======
                 DocenteCarrera dc = new DocenteCarrera();
                 dc.set("teacher_id", u.getId());
                 dc.set("carrera_id", Integer.parseInt(carreraId));
                 dc.saveIt();
 
->>>>>>> luka
                 // Cuando la creacion es exitosa
                 String mensajeExito =
                     "Docente " + name + " registrado con éxito.";
@@ -1814,8 +1610,6 @@ public class App {
             }
         });
 
-<<<<<<< HEAD
-=======
         post("/teacher/assign-materia", (req, res) -> {
             String userRole = req.session().attribute("userRole");
             if (
@@ -2557,7 +2351,6 @@ public class App {
             new MustacheTemplateEngine()
         );
 
->>>>>>> luka
         // POST: Maneja el envío del formulario de inicio de sesión.
         post(
             "/login",
@@ -2590,16 +2383,10 @@ public class App {
                     BCrypt.checkpw(plainTextPassword, ac.getString("password"))
                 ) {
                     // --- Gestión de Sesión ---
-<<<<<<< HEAD
-                    req
-                        .session(true)
-                        .attribute("currentUserUsername", username);
-=======
                     req.session(true).attribute(
                         "currentUserUsername",
                         username
                     );
->>>>>>> luka
                     req.session().attribute("userId", ac.getId());
                     req.session().attribute("loggedIn", true);
 
@@ -2688,10 +2475,6 @@ public class App {
                 );
             }
         });
-<<<<<<< HEAD
-    } // Fin del método main
-} // Fin de la clase App
-=======
         // ======================================
         // INSCRIPCION A CURSADA
         // ======================================
@@ -3601,4 +3384,3 @@ public class App {
         // (el GET /estudiante/inscripcion/examen ya filtra correctamente: solo REGULAR o LIBRE pasan)
     }
 }
->>>>>>> luka
