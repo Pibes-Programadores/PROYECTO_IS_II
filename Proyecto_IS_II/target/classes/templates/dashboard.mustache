@@ -92,6 +92,12 @@
 
         {{#isEstudiante}}
             <div class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-lg w-full max-w-2xl">
+                <h2 class="text-2xl font-bold text-yellow-400 mb-3">Aula Virtual</h2>
+                <p class="text-gray-50 mb-4">Mirá los anuncios de tus materias y confirmá tu asistencia a parciales.</p>
+                <a href="/estudiante/aula-virtual" class="inline-block bg-yellow-500 text-white py-2 px-4 rounded-md hover:bg-yellow-600 transition duration-300">Entrar</a>
+            </div>
+
+            <div class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-lg w-full max-w-2xl">
                 <h2 class="text-2xl font-bold text-green-400 mb-3">Inscripción a Materias</h2>
                 <p class="text-gray-50 mb-4">Inscribite en las materias habilitadas para cursar según tu plan de estudios.</p>
                 <a href="/estudiante/inscripcion/cursada" class="inline-block bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition duration-300">Inscribir Materias</a>
@@ -103,13 +109,26 @@
                 <a href="/estudiante/inscripcion/examen" class="inline-block bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition duration-300">Inscribir Exámenes</a>
             </div>
 
-            <div class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-lg w-full max-w-2xl">
-                <h2 class="text-2xl font-bold text-purple-400 mb-3">Aula Virtual</h2>
-                <p class="text-gray-50 mb-4">Accedé al material, anuncios, aulas y notas de las materias que estás cursando o aprobaste.</p>
-                <a href="/estudiante/aula-virtual" class="inline-block bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 transition duration-300">Ingresar</a>
-            </div>
+            <a href="/estudiante/materias"
+                class="block bg-white/10 hover:bg-white/15 border border-white/20
+                rounded-xl p-6 transition-all duration-200 group">
+                <div class="flex items-start gap-4">
+                    <div class="w-10 h-10 rounded-lg bg-[#ccd0fc]/20 flex items-center
+                        justify-center text-xl shrink-0">
+                        📚
+                    </div>
+                    <div>
+                        <h3 class="text-[#ccd0fc] font-semibold text-lg mb-1
+                           group-hover:text-white transition-colors">
+                            Mis Materias
+                        </h3>
+                        <p class="text-white/50 text-sm">
+                            Consultá tu historial académico: estado y notas por materia.
+                        </p>
+                    </div>
+                </div>
+            </a>
             {{/isEstudiante}}
-
         </div> <div class="text-center mt-6">
             <a href="/logout" class="inline-block bg-red-600 text-white py-2 px-6 rounded-md hover:bg-red-700 transition duration-300 text-lg">Cerrar Sesión</a>
         </div>

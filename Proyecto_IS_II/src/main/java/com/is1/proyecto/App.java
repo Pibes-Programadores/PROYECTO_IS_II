@@ -697,6 +697,188 @@ public class App {
             return new ModelAndView(model, "aula_virtual_tablero.mustache");
         }, new MustacheTemplateEngine());
 
+        // ─────────────────────────────────────────────────────────────────────────────
+        // GET /estudiante/materias  ⭐ NUEVO
+        //
+        // Ordena las materias exactamente igual que GET /carrera/materias:
+        // JOIN a Materia_Periodo (primer registro por materia, MIN id) para obtener
+        // el cuatrimestre del plan, y ORDER BY anio_cursada → peso cuatrimestre → nombre.
+        // El anioHeader reutiliza el mismo formato "periodo_vista" de la grilla:
+        // "1° Año - I Cuat.", "1° Año - II Cuat.", etc.
+        // ─────────────────────────────────────────────────────────────────────────────
+        get("/estudiante/materias", (req, res) -> {
+
+            // ── 1. Control de acceso ──────────────────────────────────────────────────
+            String userRole  = req.session().attribute("userRole");
+            Object userIdObj = req.session().attribute("userId");
+
+            if (!"ESTUDIANTE".equals(userRole) || userIdObj == null) {
+                res.redirect("/login?error=" + URLEncoder.encode(
+                    "Acceso restringido a estudiantes.",
+                    StandardCharsets.UTF_8.toString()
+                ));
+                return null;
+            }
+
+            int userId = ((Number) userIdObj).intValue();
+
+            Map<String, Object> model = new HashMap<>();
+
+            // ── 2. Obtener plan_estudio_id y etiqueta del plan ────────────────────────
+            List<Map> studentRows = Base.findAll(
+                "SELECT"
+                + "    s.plan_estudio_id"
+                + "  , c.nombre          AS nombre_carrera"
+                + "  , p.anio_resolucion"
+                + " FROM student s"
+                + " JOIN Plan_Estudio p ON p.id = s.plan_estudio_id"
+                + " JOIN Carrera c      ON c.id = p.carrera_id"
+                + " WHERE s.usuario_id = ?",
+                userId
+            );
+
+            if (studentRows.isEmpty()) {
+                model.put("errorMessage", "No se encontraron datos de tu cuenta de estudiante.");
+                return new ModelAndView(model, "historia_academica.mustache");
+            }
+
+            Map    studentRow    = studentRows.get(0);
+            int    planEstudioId = ((Number) studentRow.get("plan_estudio_id")).intValue();
+            String nombrePlan    = studentRow.get("nombre_carrera")
+                            + " — Plan " + studentRow.get("anio_resolucion");
+            model.put("nombrePlan", nombrePlan);
+
+            // ── 3. Materias del plan con estado académico del alumno ──────────────────
+            //
+            // El JOIN a Materia_Periodo replica la lógica de GET /carrera/materias:
+            // se toma el primer Materia_Periodo de cada materia (MIN id) para obtener
+            // el cuatrimestre del plan y ordenar correctamente dentro de cada año.
+            //
+            // ORDER BY:
+            //   1° m.anio_cursada ASC         (año curricular)
+            //   2° peso del cuatrimestre ASC  (PRIMER/ANUAL=1, SEGUNDO=2, VERANO=3)
+            //   3° m.nombre ASC               (desempate alfabético)
+            List<Map> rows = Base.findAll(
+                "SELECT"
+                + "    m.codigo"
+                + "  , m.nombre"
+                + "  , m.anio_cursada"
+                + "  , mp_plan.tipo_cuatrimestre"
+                + "  , ea.estado"
+                + "  , ("
+                + "        SELECT n.valor"
+                + "        FROM Nota n"
+                + "        JOIN Materia_Periodo mp ON mp.id = n.materia_periodo_id"
+                + "        WHERE mp.materia_codigo = m.codigo"
+                + "          AND n.student_id      = ?"
+                + "        ORDER BY n.fecha_carga DESC"
+                + "        LIMIT 1"
+                + "    ) AS nota"
+                + " FROM Materia m"
+                + " LEFT JOIN Materia_Periodo mp_plan"
+                + "        ON mp_plan.materia_codigo = m.codigo"
+                + "       AND mp_plan.id = ("
+                + "               SELECT MIN(id)"
+                + "               FROM Materia_Periodo"
+                + "               WHERE materia_codigo = m.codigo"
+                + "           )"
+                + " LEFT JOIN Estado_Academico ea"
+                + "        ON ea.materia_codigo = m.codigo"
+                + "       AND ea.usuario_id     = ?"
+                + " WHERE m.plan_estudio_id = ?"
+                + " ORDER BY m.anio_cursada ASC"
+                + "        , CASE mp_plan.tipo_cuatrimestre"
+                + "              WHEN 'PRIMER_CUATRIMESTRE'  THEN 1"
+                + "              WHEN 'ANUAL'                THEN 1"
+                + "              WHEN 'SEGUNDO_CUATRIMESTRE' THEN 2"
+                + "              WHEN 'VERANO'               THEN 3"
+                + "              ELSE 4"
+                + "          END ASC"
+                + "        , m.nombre ASC",
+                userId, userId, planEstudioId
+            );
+
+            // ── 4. Transformar filas para Mustache ────────────────────────────────────
+            List<Map<String, Object>> materias      = new ArrayList<>();
+            String                    grupoAnterior = "";
+
+            for (Map row : rows) {
+                Map<String, Object> item = new HashMap<>();
+
+                item.put("codigo",       row.get("codigo"));
+                item.put("nombre",       row.get("nombre"));
+                item.put("anio_cursada", row.get("anio_cursada"));
+
+                // Estado: "-" si la materia nunca fue cursada (LEFT JOIN → NULL)
+                String estado = (String) row.get("estado");
+                item.put("estado", estado != null ? estado : "-");
+
+                // Nota: DECIMAL(5,2) llega como BigDecimal. Sin nota → "-".
+                Object notaVal = row.get("nota");
+                if (notaVal != null) {
+                    java.math.BigDecimal bd = new java.math.BigDecimal(notaVal.toString());
+                    item.put("nota", bd.stripTrailingZeros().toPlainString());
+                } else {
+                    item.put("nota", "-");
+                }
+
+                // Badge CSS — precomputado porque Mustache es logic-less.
+                String estadoClase;
+                switch (estado != null ? estado : "") {
+                    case "APROBADO":
+                        estadoClase = "bg-green-500/20 text-green-300 border-green-500/40";
+                        break;
+                    case "PROMOCION":
+                        estadoClase = "bg-yellow-400/20 text-yellow-200 border-yellow-400/40";
+                        break;
+                    case "REGULAR":
+                        estadoClase = "bg-blue-500/20 text-blue-300 border-blue-500/40";
+                        break;
+                    case "INSCRIPTO":
+                        estadoClase = "bg-purple-500/20 text-purple-300 border-purple-500/40";
+                        break;
+                    case "REPROBADO":
+                        estadoClase = "bg-red-500/20 text-red-300 border-red-500/40";
+                        break;
+                    case "LIBRE":
+                        estadoClase = "bg-orange-500/20 text-orange-300 border-orange-500/40";
+                        break;
+                    default:
+                        estadoClase = "bg-white/5 text-white/30 border-white/10";
+                        break;
+                }
+                item.put("estadoClase", estadoClase);
+
+                // anioHeader: mismo formato periodo_vista de GET /carrera/materias.
+                // Ejemplo: "1° Año - I Cuat.", "1° Año - II Cuat.", "2° Año - Anual"
+                // Se emite solo en la primera materia de cada grupo año+cuatrimestre.
+                int    anio         = ((Number) row.get("anio_cursada")).intValue();
+                String cuatrimestre = row.get("tipo_cuatrimestre") != null
+                                    ? (String) row.get("tipo_cuatrimestre")
+                                    : "PRIMER_CUATRIMESTRE";
+                String grupoActual  = anio + "_" + cuatrimestre;
+
+                if (!grupoActual.equals(grupoAnterior)) {
+                    String labelCuatri;
+                    switch (cuatrimestre) {
+                        case "PRIMER_CUATRIMESTRE":  labelCuatri = "I Cuat.";  break;
+                        case "SEGUNDO_CUATRIMESTRE": labelCuatri = "II Cuat."; break;
+                        case "ANUAL":                labelCuatri = "Anual";    break;
+                        case "VERANO":               labelCuatri = "Verano";   break;
+                        default:                     labelCuatri = cuatrimestre; break;
+                    }
+                    item.put("anioHeader", anio + "° Año - " + labelCuatri);
+                    grupoAnterior = grupoActual;
+                }
+
+                materias.add(item);
+            }
+
+            model.put("materias", materias);
+            return new ModelAndView(model, "historia_academica.mustache");
+
+        }, new MustacheTemplateEngine());
+
         // ==========================================
         // GESTIÓN DE SECRETARIOS
         // ==========================================
@@ -1607,10 +1789,8 @@ post("/docente/materia/:materiaId/nota", (req, res) -> {
         return "";
     }
 
-    String estadoCursada = req.queryParams("estado_cursada");
-    if (estadoCursada == null || estadoCursada.isEmpty()) estadoCursada = "REGULAR";
 
-        String estadoCursada = req.queryParams("estado_cursada");
+    String estadoCursada = req.queryParams("estado_cursada");
     if (estadoCursada == null || estadoCursada.isEmpty()) estadoCursada = "REGULAR";
 
     try {
