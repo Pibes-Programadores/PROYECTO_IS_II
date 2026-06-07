@@ -4,36 +4,35 @@ import static spark.Spark.*; // Importa los métodos estáticos principales de S
 
 // Importaciones necesarias para la aplicación Spark
 import com.fasterxml.jackson.databind.ObjectMapper; // Utilidad para serializar/deserializar objetos Java a/desde JSON.
+import com.is1.proyecto.config.DBConfigSingleton; // Clase Singleton para la configuración de la base de datos.
 // Importaciones de clases del proyecto
 import com.is1.proyecto.models.Anuncio;
-import com.is1.proyecto.models.Nota;
 import com.is1.proyecto.models.AulaAsignacion;
-import com.is1.proyecto.config.DBConfigSingleton; // Clase Singleton para la configuración de la base de datos.
-import com.is1.proyecto.models.SecretariaAcademica;
-import com.is1.proyecto.models.Student;
 import com.is1.proyecto.models.Carrera;
-import com.is1.proyecto.models.PlanEstudio;
+import com.is1.proyecto.models.Correlatividad;
+import com.is1.proyecto.models.DocenteCarrera;
+import com.is1.proyecto.models.DocenteMateria;
+import com.is1.proyecto.models.EstadoAcademico;
+import com.is1.proyecto.models.InscripcionExamen;
 import com.is1.proyecto.models.Materia;
 import com.is1.proyecto.models.MateriaPeriodo;
-import com.is1.proyecto.models.Correlatividad;
-import com.is1.proyecto.models.DocenteMateria;
 import com.is1.proyecto.models.MesaExamen;
-import com.is1.proyecto.models.InscripcionExamen;
-import com.is1.proyecto.models.EstadoAcademico;
-import java.util.ArrayList;
-import java.util.List;
-
+import com.is1.proyecto.models.Nota;
+import com.is1.proyecto.models.PlanEstudio;
+import com.is1.proyecto.models.SecretariaAcademica;
+import com.is1.proyecto.models.Student;
 // Importaciones específicas para ActiveJDBC (ORM para la base de datos)
 import com.is1.proyecto.models.Teacher;
 import com.is1.proyecto.models.User; // Modelo de ActiveJDBC que representa la tabla 'users'.
+import com.mysql.cj.exceptions.StreamingNotifiable;
 import java.net.URLEncoder;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import com.is1.proyecto.models.DocenteCarrera;
+import java.util.ArrayList;
 // Importaciones estándar de Java
 import java.util.HashMap; // Para crear mapas de datos (modelos para las plantillas).
+import java.util.List;
 import java.util.Map; // Interfaz Map, utilizada para Map.of() o HashMap.
-
-import com.mysql.cj.exceptions.StreamingNotifiable;
 import org.javalite.activejdbc.Base; // Clase central de ActiveJDBC para gestionar la conexión a la base de datos.
 import org.javalite.activejdbc.Model;
 import org.mindrot.jbcrypt.BCrypt; // Utilidad para hashear y verificar contraseñas de forma segura.
@@ -86,68 +85,6 @@ public class App {
             }
         });
 
-        get("/estudiante/inscripcion/examen", (req, res) -> {
-            // 1. Leemos la sesión real usando las variables del proyecto
-            String currentUsername = req.session().attribute("currentUserUsername");
-            String userRole = req.session().attribute("userRole");
-            Boolean loggedIn = req.session().attribute("loggedIn");
-
-            // VALIDACIÓN REAL: Si no está logueado o no es estudiante, rebota al login de una
-            if (currentUsername == null || loggedIn == null || !loggedIn || !"ESTUDIANTE".equals(userRole)) {
-                res.redirect("/?error=" + URLEncoder.encode("Debes iniciar sesión como estudiante para acceder.", StandardCharsets.UTF_8.toString()));
-                return null;
-            }
-
-            // 2. Buscamos el ID en la base de datos de forma limpia con el usuario de la sesión
-            User alumno = User.findFirst("nombre_usuario = ?", currentUsername);
-            if (alumno == null) {
-                res.redirect("/?error=" + URLEncoder.encode("Usuario no encontrado.", StandardCharsets.UTF_8.toString()));
-                return null;
-            }
-            int alumnoId = (int) alumno.getId();
-
-            List<Map<String, Object>> mesasHabilitadas = new ArrayList<>();
-
-            try {
-                // 3. Traemos todas las mesas de examen disponibles de la BD usando ActiveJDBC
-                List<MesaExamen> todasLasMesas = MesaExamen.findAll();
-
-                for (MesaExamen mesa : todasLasMesas) {
-                    Map<String, Object> datosMesa = new HashMap<>();
-                    datosMesa.put("id", mesa.getId());
-                    datosMesa.put("fecha", mesa.get("fecha"));
-
-                    // Buscamos el nombre de la materia vinculada a la mesa
-                    Materia materia = Materia.findById(mesa.get("materia_codigo"));
-                    if (materia != null) {
-                        datosMesa.put("materia_nombre", materia.get("nombre"));
-                    } else {
-                        datosMesa.put("materia_nombre", "Materia Desconocida");
-                    }
-
-                    // Chequeamos si el alumno ya se inscribió a esta mesa
-                    boolean yaInscripto = InscripcionExamen.findFirst(
-                            "usuario_id = ? AND mesa_id = ?",
-                            alumnoId,
-                            mesa.getId()
-                    ) != null;
-
-                    datosMesa.put("yaInscripto", yaInscripto);
-                    mesasHabilitadas.add(datosMesa);
-                }
-            } catch (Exception e) {
-                System.err.println("Error al procesar las mesas: " + e.getMessage());
-                e.printStackTrace();
-            }
-
-            // 4. Armamos el modelo de datos para Mustache
-            Map<String, Object> viewData = new HashMap<>();
-            viewData.put("mesas", mesasHabilitadas);
-            viewData.put("username", currentUsername);
-
-            // 5. Renderizamos tu plantilla mustache
-            return new ModelAndView(viewData, "inscripcion_examenes.mustache");
-        }, new MustacheTemplateEngine());
 
         // --- Rutas GET para renderizar formularios y páginas HTML ---
 
@@ -221,68 +158,74 @@ public class App {
         // GET: Ruta para MOSTRAR el formulario de carga de docente
         // modifiqué para que ande bien lo de asignar docentes
         get(
-                "/teacher/new",
-                (req, res) -> {
-                    Map<String, Object> model = new HashMap<>();
+            "/teacher/new",
+            (req, res) -> {
+                Map<String, Object> model = new HashMap<>();
 
-                    String successMessage = req.queryParams("message");
-                    String errorMessage = req.queryParams("error");
+                String successMessage = req.queryParams("message");
+                String errorMessage = req.queryParams("error");
 
-                    if (successMessage != null && !successMessage.isEmpty()) {
-                        model.put("successMessage", successMessage);
-                    }
-                    if (errorMessage != null && !errorMessage.isEmpty()) {
-                        model.put("errorMessage", errorMessage);
-                    }
+                if (successMessage != null && !successMessage.isEmpty()) {
+                    model.put("successMessage", successMessage);
+                }
+                if (errorMessage != null && !errorMessage.isEmpty()) {
+                    model.put("errorMessage", errorMessage);
+                }
 
-                    List<Map> carreras = Base.findAll("SELECT id, nombre FROM Carrera ORDER BY nombre ASC");
-                    model.put("carreras", carreras);
+                List<Map> carreras = Base.findAll(
+                    "SELECT id, nombre FROM Carrera ORDER BY nombre ASC"
+                );
+                model.put("carreras", carreras);
 
-                    return new ModelAndView(model, "teacher_from.mustache");
-                },
-                new MustacheTemplateEngine()
+                return new ModelAndView(model, "teacher_from.mustache");
+            },
+            new MustacheTemplateEngine()
         );
 
         get(
-                "/teacher/assign-materia",
-                (req, res) -> {
-                    String userRole = req.session().attribute("userRole");
-                    if (userRole == null || (!userRole.equals("SECRETARIA") && !userRole.equals("ADMIN"))) {
-                        String errorMessage = URLEncoder.encode(
-                                "Acceso denegado. Solo SECRETARIA puede asignar materias.",
-                                StandardCharsets.UTF_8.toString()
-                        );
-                        res.redirect("/dashboard?error=" + errorMessage);
-                        return null;
-                    }
-
-                    Map<String, Object> model = new HashMap<>();
-
-                    String successMessage = req.queryParams("message");
-                    String errorMessage   = req.queryParams("error");
-                    if (successMessage != null && !successMessage.isEmpty()) {
-                        model.put("successMessage", successMessage);
-                    }
-                    if (errorMessage != null && !errorMessage.isEmpty()) {
-                        model.put("errorMessage", errorMessage);
-                    }
-
-                    // Solo enviamos los Planes de Estudio vigentes.
-                    List<Map> planesVigentes = Base.findAll(
-                            "SELECT p.id AS id, c.id AS carrera_id, " +
-                                    "CONCAT(c.nombre, ' — Plan ', p.anio_resolucion) AS descripcion " +
-                                    "FROM Plan_Estudio p " +
-                                    "JOIN Carrera c ON p.carrera_id = c.id " +
-                                    "WHERE p.estado = 'VIGENTE' " +
-                                    "ORDER BY c.nombre ASC, p.anio_resolucion DESC"
+            "/teacher/assign-materia",
+            (req, res) -> {
+                String userRole = req.session().attribute("userRole");
+                if (
+                    userRole == null ||
+                    (!userRole.equals("SECRETARIA") &&
+                        !userRole.equals("ADMIN"))
+                ) {
+                    String errorMessage = URLEncoder.encode(
+                        "Acceso denegado. Solo SECRETARIA puede asignar materias.",
+                        StandardCharsets.UTF_8.toString()
                     );
+                    res.redirect("/dashboard?error=" + errorMessage);
+                    return null;
+                }
 
-                    // ya no docentes ni materias.
-                    model.put("planes", planesVigentes);
+                Map<String, Object> model = new HashMap<>();
 
-                    return new ModelAndView(model, "assign_materia_form.mustache");
-                },
-                new MustacheTemplateEngine()
+                String successMessage = req.queryParams("message");
+                String errorMessage = req.queryParams("error");
+                if (successMessage != null && !successMessage.isEmpty()) {
+                    model.put("successMessage", successMessage);
+                }
+                if (errorMessage != null && !errorMessage.isEmpty()) {
+                    model.put("errorMessage", errorMessage);
+                }
+
+                // Solo enviamos los Planes de Estudio vigentes.
+                List<Map> planesVigentes = Base.findAll(
+                    "SELECT p.id AS id, c.id AS carrera_id, " +
+                        "CONCAT(c.nombre, ' — Plan ', p.anio_resolucion) AS descripcion " +
+                        "FROM Plan_Estudio p " +
+                        "JOIN Carrera c ON p.carrera_id = c.id " +
+                        "WHERE p.estado = 'VIGENTE' " +
+                        "ORDER BY c.nombre ASC, p.anio_resolucion DESC"
+                );
+
+                // ya no docentes ni materias.
+                model.put("planes", planesVigentes);
+
+                return new ModelAndView(model, "assign_materia_form.mustache");
+            },
+            new MustacheTemplateEngine()
         );
 
         // GET /api/materias-por-plan?plan_id=X
@@ -294,7 +237,7 @@ public class App {
             if (planIdParam == null || planIdParam.isBlank()) {
                 res.status(400);
                 return objectMapper.writeValueAsString(
-                        Map.of("error", "Se requiere el parámetro plan_id.")
+                    Map.of("error", "Se requiere el parámetro plan_id.")
                 );
             }
 
@@ -302,34 +245,33 @@ public class App {
                 int planId = Integer.parseInt(planIdParam.trim());
 
                 List<Map> materias = Base.findAll(
-                        "SELECT codigo AS id, nombre " +
-                                "FROM Materia " +
-                                "WHERE plan_estudio_id = ? " +
-                                "ORDER BY anio_cursada ASC, nombre ASC",
-                        planId
+                    "SELECT codigo AS id, nombre " +
+                        "FROM Materia " +
+                        "WHERE plan_estudio_id = ? " +
+                        "ORDER BY anio_cursada ASC, nombre ASC",
+                    planId
                 );
 
                 // Convertimos a List<Map<String,Object>> para serialización limpia con Jackson
                 List<Map<String, Object>> resultado = new ArrayList<>();
                 for (Map m : materias) {
                     Map<String, Object> item = new HashMap<>();
-                    item.put("id",     m.get("id"));
+                    item.put("id", m.get("id"));
                     item.put("nombre", m.get("nombre"));
                     resultado.add(item);
                 }
 
                 return objectMapper.writeValueAsString(resultado);
-
             } catch (NumberFormatException e) {
                 res.status(400);
                 return objectMapper.writeValueAsString(
-                        Map.of("error", "plan_id debe ser un número entero.")
+                    Map.of("error", "plan_id debe ser un número entero.")
                 );
             } catch (Exception e) {
                 e.printStackTrace();
                 res.status(500);
                 return objectMapper.writeValueAsString(
-                        Map.of("error", "Error interno al obtener materias.")
+                    Map.of("error", "Error interno al obtener materias.")
                 );
             }
         });
@@ -341,12 +283,12 @@ public class App {
             res.type("application/json");
 
             String carreraIdParam = req.queryParams("carrera_id");
-            String query          = req.queryParams("query");
+            String query = req.queryParams("query");
 
             if (carreraIdParam == null || carreraIdParam.isBlank()) {
                 res.status(400);
                 return objectMapper.writeValueAsString(
-                        Map.of("error", "Se requiere el parámetro carrera_id.")
+                    Map.of("error", "Se requiere el parámetro carrera_id.")
                 );
             }
             if (query == null) query = "";
@@ -358,56 +300,52 @@ public class App {
                 // Buscamos docentes vinculados a la carrera cuyo nombre, apellido
                 // o legajo coincidan con el término de búsqueda (LIKE, case-insensitive).
                 List<Map> rows = Base.findAll(
-                        "SELECT t.usuario_id AS id, " +
-                                "       t.legajo_docente AS legajo, " +
-                                "       u.nombre, " +
-                                "       u.apellido " +
-                                "FROM teacher t " +
-                                "JOIN users u           ON u.id = t.usuario_id " +
-                                "JOIN Docente_Carrera dc ON dc.teacher_id = t.usuario_id " +
-                                "WHERE dc.carrera_id = ? " +
-                                "  AND (u.nombre LIKE ? OR u.apellido LIKE ? OR t.legajo_docente LIKE ?) " +
-                                "ORDER BY u.apellido ASC, u.nombre ASC " +
-                                "LIMIT 20",
-                        carreraId, like, like, like
+                    "SELECT t.usuario_id AS id, " +
+                        "       t.legajo_docente AS legajo, " +
+                        "       u.nombre, " +
+                        "       u.apellido " +
+                        "FROM teacher t " +
+                        "JOIN users u           ON u.id = t.usuario_id " +
+                        "JOIN Docente_Carrera dc ON dc.teacher_id = t.usuario_id " +
+                        "WHERE dc.carrera_id = ? " +
+                        "  AND (u.nombre LIKE ? OR u.apellido LIKE ? OR t.legajo_docente LIKE ?) " +
+                        "ORDER BY u.apellido ASC, u.nombre ASC " +
+                        "LIMIT 20",
+                    carreraId,
+                    like,
+                    like,
+                    like
                 );
 
                 List<Map<String, Object>> resultado = new ArrayList<>();
                 for (Map row : rows) {
                     Map<String, Object> item = new HashMap<>();
-                    item.put("id",     row.get("id"));
+                    item.put("id", row.get("id"));
                     // Formato: LEGAJO - APELLIDO, Nombre
-                    String label = row.get("legajo") + " — " +
-                            row.get("apellido") + ", " +
-                            row.get("nombre");
+                    String label =
+                        row.get("legajo") +
+                        " — " +
+                        row.get("apellido") +
+                        ", " +
+                        row.get("nombre");
                     item.put("label", label);
                     resultado.add(item);
                 }
 
                 return objectMapper.writeValueAsString(resultado);
-
             } catch (NumberFormatException e) {
                 res.status(400);
                 return objectMapper.writeValueAsString(
-                        Map.of("error", "carrera_id debe ser un número entero.")
+                    Map.of("error", "carrera_id debe ser un número entero.")
                 );
             } catch (Exception e) {
                 e.printStackTrace();
                 res.status(500);
                 return objectMapper.writeValueAsString(
-                        Map.of("error", "Error interno en la búsqueda de docentes.")
+                    Map.of("error", "Error interno en la búsqueda de docentes.")
                 );
             }
         });
-
-
-
-
-
-
-
-
-
 
         // Importar el modelo Teacher al inicio del archivo si no está:
         // import com.is1.proyecto.models.Teacher;
@@ -480,11 +418,11 @@ public class App {
 
                 List<Map> planesVigentes = Base.findAll(
                     "SELECT p.id AS id, " +
-                    "CONCAT(c.nombre, ' (Plan Resol: ', p.anio_resolucion, ')') AS descripcion " +
-                    "FROM Plan_Estudio p " +
-                    "JOIN Carrera c ON p.carrera_id = c.id " +
-                    "WHERE p.estado = 'VIGENTE' " +
-                    "ORDER BY c.nombre ASC"
+                        "CONCAT(c.nombre, ' (Plan Resol: ', p.anio_resolucion, ')') AS descripcion " +
+                        "FROM Plan_Estudio p " +
+                        "JOIN Carrera c ON p.carrera_id = c.id " +
+                        "WHERE p.estado = 'VIGENTE' " +
+                        "ORDER BY c.nombre ASC"
                 );
                 model.put("planes", planesVigentes);
 
@@ -519,7 +457,8 @@ public class App {
                 email == null ||
                 legajo == null ||
                 tipoEstudiante == null ||
-                planEstudioId == null || planEstudioId.isBlank()
+                planEstudioId == null ||
+                planEstudioId.isBlank()
             ) {
                 String errorMsg = URLEncoder.encode(
                     "Todos los campos (incluyendo legajo) son obligatorios.",
@@ -545,7 +484,10 @@ public class App {
                 // no es AUTO_INCREMENT y el id se provee explícitamente).
                 Base.exec(
                     "INSERT INTO student (usuario_id, legajo, tipo_estudiante, plan_estudio_id) VALUES (?, ?, ?, ?)",
-                    u.getId(), legajo, tipoEstudiante, Integer.parseInt(planEstudioId)
+                    u.getId(),
+                    legajo,
+                    tipoEstudiante,
+                    Integer.parseInt(planEstudioId)
                 );
 
                 Base.commitTransaction();
@@ -573,129 +515,156 @@ public class App {
         // ====================================================
         // AULA VIRTUAL (ESTUDIANTE) - SELECTOR
         // ====================================================
-        get("/estudiante/aula-virtual", (req, res) -> {
-            if (req.session().attribute("userRole") == null || !req.session().attribute("userRole").equals("ESTUDIANTE")) {
-                res.redirect("/login");
-                return null;
-            }
+        get(
+            "/estudiante/aula-virtual",
+            (req, res) -> {
+                if (
+                    req.session().attribute("userRole") == null ||
+                    !req.session().attribute("userRole").equals("ESTUDIANTE")
+                ) {
+                    res.redirect("/login");
+                    return null;
+                }
 
-            int alumnoId = req.session().attribute("userId");
-            Map<String, Object> model = new HashMap<>();
-            
-            // Buscar materias válidas para el alumno (incluimos PROMOCION por si acaso ya se cargaron así)
-            List<Map> materias = Base.findAll(
-                "SELECT m.codigo, m.nombre, ea.estado " +
-                "FROM Estado_Academico ea " +
-                "JOIN Materia m ON ea.materia_codigo = m.codigo " +
-                "WHERE ea.usuario_id = ? AND ea.estado IN ('INSCRIPTO', 'REGULAR', 'APROBADO', 'PROMOCION')",
-                alumnoId
-            );
-            
-            model.put("materias", materias);
-            return new ModelAndView(model, "aula_virtual_selector.mustache");
-        }, new MustacheTemplateEngine());
+                int alumnoId = req.session().attribute("userId");
+                Map<String, Object> model = new HashMap<>();
+
+                // Buscar materias válidas para el alumno (incluimos PROMOCION por si acaso ya se cargaron así)
+                List<Map> materias = Base.findAll(
+                    "SELECT m.codigo, m.nombre, ea.estado " +
+                        "FROM Estado_Academico ea " +
+                        "JOIN Materia m ON ea.materia_codigo = m.codigo " +
+                        "WHERE ea.usuario_id = ? AND ea.estado IN ('INSCRIPTO', 'REGULAR', 'APROBADO', 'PROMOCION')",
+                    alumnoId
+                );
+
+                model.put("materias", materias);
+                return new ModelAndView(
+                    model,
+                    "aula_virtual_selector.mustache"
+                );
+            },
+            new MustacheTemplateEngine()
+        );
 
         // ================================================
         // AULA VIRTUAL (ESTUDIANTE) - TABLERO DE MATERIA
         // ================================================
-        get("/estudiante/aula-virtual/materia", (req, res) -> {
-            if (req.session().attribute("userRole") == null || !req.session().attribute("userRole").equals("ESTUDIANTE")) {
-                res.redirect("/login");
-                return null;
-            }
+        get(
+            "/estudiante/aula-virtual/materia",
+            (req, res) -> {
+                if (
+                    req.session().attribute("userRole") == null ||
+                    !req.session().attribute("userRole").equals("ESTUDIANTE")
+                ) {
+                    res.redirect("/login");
+                    return null;
+                }
 
-            int alumnoId = req.session().attribute("userId");
-            String materiaCodigoStr = req.queryParams("materia_codigo");
-            
-            if (materiaCodigoStr == null || materiaCodigoStr.isBlank()) {
-                res.redirect("/estudiante/aula-virtual");
-                return null;
-            }
-            
-            int materiaCodigo = Integer.parseInt(materiaCodigoStr);
+                int alumnoId = req.session().attribute("userId");
+                String materiaCodigoStr = req.queryParams("materia_codigo");
 
-            // 1. Validar Seguridad: ¿El estudiante está realmente inscripto en esta materia?
-            List<Map> estadoAcademico = Base.findAll(
-                "SELECT ea.estado, m.nombre " +
-                "FROM Estado_Academico ea " +
-                "JOIN Materia m ON ea.materia_codigo = m.codigo " +
-                "WHERE ea.usuario_id = ? AND ea.materia_codigo = ?",
-                alumnoId, materiaCodigo
-            );
+                if (materiaCodigoStr == null || materiaCodigoStr.isBlank()) {
+                    res.redirect("/estudiante/aula-virtual");
+                    return null;
+                }
 
-            if (estadoAcademico.isEmpty()) {
-                res.redirect("/dashboard?error=No+tienes+acceso+a+esta+materia");
-                return null;
-            }
+                int materiaCodigo = Integer.parseInt(materiaCodigoStr);
 
-            String estadoAlumno = (String) estadoAcademico.get(0).get("estado");
-            String materiaNombre = (String) estadoAcademico.get(0).get("nombre");
-
-            Map<String, Object> model = new HashMap<>();
-            model.put("materia_codigo", materiaCodigo);
-            model.put("materia_nombre", materiaNombre);
-            model.put("estado_alumno", estadoAlumno);
-
-            // 2. Buscar el ID del periodo activo de la materia para cruzar anuncios y notas
-            List<Map> periodos = Base.findAll(
-                "SELECT id FROM Materia_Periodo WHERE materia_codigo = ? ORDER BY anio_academico DESC LIMIT 1",
-                materiaCodigo
-            );
-
-            if (!periodos.isEmpty()) {
-                int materiaPeriodoId = ((Number) periodos.get(0).get("id")).intValue();
-
-                // A. Buscar Nota
-                List<Map> notas = Base.findAll(
-                    "SELECT valor FROM Nota WHERE student_id = ? AND materia_periodo_id = ?",
-                    alumnoId, materiaPeriodoId
+                // 1. Validar Seguridad: ¿El estudiante está realmente inscripto en esta materia?
+                List<Map> estadoAcademico = Base.findAll(
+                    "SELECT ea.estado, m.nombre " +
+                        "FROM Estado_Academico ea " +
+                        "JOIN Materia m ON ea.materia_codigo = m.codigo " +
+                        "WHERE ea.usuario_id = ? AND ea.materia_codigo = ?",
+                    alumnoId,
+                    materiaCodigo
                 );
-                if (notas.isEmpty()) {
-                    model.put("sinNota", true);
+
+                if (estadoAcademico.isEmpty()) {
+                    res.redirect(
+                        "/dashboard?error=No+tienes+acceso+a+esta+materia"
+                    );
+                    return null;
+                }
+
+                String estadoAlumno = (String) estadoAcademico
+                    .get(0)
+                    .get("estado");
+                String materiaNombre = (String) estadoAcademico
+                    .get(0)
+                    .get("nombre");
+
+                Map<String, Object> model = new HashMap<>();
+                model.put("materia_codigo", materiaCodigo);
+                model.put("materia_nombre", materiaNombre);
+                model.put("estado_alumno", estadoAlumno);
+
+                // 2. Buscar el ID del periodo activo de la materia para cruzar anuncios y notas
+                List<Map> periodos = Base.findAll(
+                    "SELECT id FROM Materia_Periodo WHERE materia_codigo = ? ORDER BY anio_academico DESC LIMIT 1",
+                    materiaCodigo
+                );
+
+                if (!periodos.isEmpty()) {
+                    int materiaPeriodoId = (
+                        (Number) periodos.get(0).get("id")
+                    ).intValue();
+
+                    // A. Buscar Nota
+                    List<Map> notas = Base.findAll(
+                        "SELECT valor FROM Nota WHERE student_id = ? AND materia_periodo_id = ?",
+                        alumnoId,
+                        materiaPeriodoId
+                    );
+                    if (notas.isEmpty()) {
+                        model.put("sinNota", true);
+                    } else {
+                        model.put("sinNota", false);
+                        model.put("nota_valor", notas.get(0).get("valor"));
+                    }
+
+                    // B. Buscar Docentes y Aulas
+                    List<Map> docentesAulas = Base.findAll(
+                        "SELECT u.nombre as docente_nombre, u.apellido as docente_apellido, a.aula " +
+                            "FROM Aula_Asignacion a " +
+                            "JOIN users u ON a.teacher_id = u.id " +
+                            "WHERE a.materia_periodo_id = ?",
+                        materiaPeriodoId
+                    );
+                    model.put("docentes_aulas", docentesAulas);
+
+                    // C. Buscar Anuncios
+                    List<Map> anuncios = Base.findAll(
+                        "SELECT an.titulo, an.contenido, an.tipo, an.fecha_examen, " +
+                            "CONCAT(u.nombre, ' ', u.apellido) as autor, " +
+                            "DATE_FORMAT(an.fecha_creacion, '%d/%m/%Y %H:%i') as fecha " +
+                            "FROM Anuncio an " +
+                            "JOIN users u ON an.teacher_id = u.id " +
+                            "WHERE an.materia_periodo_id = ? " +
+                            "ORDER BY an.fecha_creacion DESC",
+                        materiaPeriodoId
+                    );
+
+                    List<Map<String, Object>> anunciosProcesados =
+                        new java.util.ArrayList<>();
+                    for (Map an : anuncios) {
+                        Map<String, Object> anDto = new HashMap<>(an);
+                        anDto.put("esExamen", "EXAMEN".equals(an.get("tipo")));
+                        anunciosProcesados.add(anDto);
+                    }
+                    model.put("anuncios", anunciosProcesados);
                 } else {
-                    model.put("sinNota", false);
-                    model.put("nota_valor", notas.get(0).get("valor"));
+                    // Si la materia no tiene periodos configurados
+                    model.put("sinNota", true);
+                    model.put("docentes_aulas", new java.util.ArrayList<>());
+                    model.put("anuncios", new java.util.ArrayList<>());
                 }
 
-                // B. Buscar Docentes y Aulas
-                List<Map> docentesAulas = Base.findAll(
-                    "SELECT u.nombre as docente_nombre, u.apellido as docente_apellido, a.aula " +
-                    "FROM Aula_Asignacion a " +
-                    "JOIN users u ON a.teacher_id = u.id " +
-                    "WHERE a.materia_periodo_id = ?",
-                    materiaPeriodoId
-                );
-                model.put("docentes_aulas", docentesAulas);
-
-                // C. Buscar Anuncios
-                List<Map> anuncios = Base.findAll(
-                    "SELECT an.titulo, an.contenido, an.tipo, an.fecha_examen, " +
-                    "CONCAT(u.nombre, ' ', u.apellido) as autor, " +
-                    "DATE_FORMAT(an.fecha_creacion, '%d/%m/%Y %H:%i') as fecha " +
-                    "FROM Anuncio an " +
-                    "JOIN users u ON an.teacher_id = u.id " +
-                    "WHERE an.materia_periodo_id = ? " +
-                    "ORDER BY an.fecha_creacion DESC",
-                    materiaPeriodoId
-                );
-
-                List<Map<String, Object>> anunciosProcesados = new java.util.ArrayList<>();
-                for (Map an : anuncios) {
-                    Map<String, Object> anDto = new HashMap<>(an);
-                    anDto.put("esExamen", "EXAMEN".equals(an.get("tipo")));
-                    anunciosProcesados.add(anDto);
-                }
-                model.put("anuncios", anunciosProcesados);
-
-            } else {
-                // Si la materia no tiene periodos configurados
-                model.put("sinNota", true);
-                model.put("docentes_aulas", new java.util.ArrayList<>());
-                model.put("anuncios", new java.util.ArrayList<>());
-            }
-
-            return new ModelAndView(model, "aula_virtual_tablero.mustache");
-        }, new MustacheTemplateEngine());
+                return new ModelAndView(model, "aula_virtual_tablero.mustache");
+            },
+            new MustacheTemplateEngine()
+        );
 
         // ─────────────────────────────────────────────────────────────────────────────
         // GET /estudiante/materias  ⭐ NUEVO
@@ -706,178 +675,218 @@ public class App {
         // El anioHeader reutiliza el mismo formato "periodo_vista" de la grilla:
         // "1° Año - I Cuat.", "1° Año - II Cuat.", etc.
         // ─────────────────────────────────────────────────────────────────────────────
-        get("/estudiante/materias", (req, res) -> {
+        get(
+            "/estudiante/materias",
+            (req, res) -> {
+                // ── 1. Control de acceso ──────────────────────────────────────────────────
+                String userRole = req.session().attribute("userRole");
+                Object userIdObj = req.session().attribute("userId");
 
-            // ── 1. Control de acceso ──────────────────────────────────────────────────
-            String userRole  = req.session().attribute("userRole");
-            Object userIdObj = req.session().attribute("userId");
-
-            if (!"ESTUDIANTE".equals(userRole) || userIdObj == null) {
-                res.redirect("/login?error=" + URLEncoder.encode(
-                    "Acceso restringido a estudiantes.",
-                    StandardCharsets.UTF_8.toString()
-                ));
-                return null;
-            }
-
-            int userId = ((Number) userIdObj).intValue();
-
-            Map<String, Object> model = new HashMap<>();
-
-            // ── 2. Obtener plan_estudio_id y etiqueta del plan ────────────────────────
-            List<Map> studentRows = Base.findAll(
-                "SELECT"
-                + "    s.plan_estudio_id"
-                + "  , c.nombre          AS nombre_carrera"
-                + "  , p.anio_resolucion"
-                + " FROM student s"
-                + " JOIN Plan_Estudio p ON p.id = s.plan_estudio_id"
-                + " JOIN Carrera c      ON c.id = p.carrera_id"
-                + " WHERE s.usuario_id = ?",
-                userId
-            );
-
-            if (studentRows.isEmpty()) {
-                model.put("errorMessage", "No se encontraron datos de tu cuenta de estudiante.");
-                return new ModelAndView(model, "historia_academica.mustache");
-            }
-
-            Map    studentRow    = studentRows.get(0);
-            int    planEstudioId = ((Number) studentRow.get("plan_estudio_id")).intValue();
-            String nombrePlan    = studentRow.get("nombre_carrera")
-                            + " — Plan " + studentRow.get("anio_resolucion");
-            model.put("nombrePlan", nombrePlan);
-
-            // ── 3. Materias del plan con estado académico del alumno ──────────────────
-            //
-            // El JOIN a Materia_Periodo replica la lógica de GET /carrera/materias:
-            // se toma el primer Materia_Periodo de cada materia (MIN id) para obtener
-            // el cuatrimestre del plan y ordenar correctamente dentro de cada año.
-            //
-            // ORDER BY:
-            //   1° m.anio_cursada ASC         (año curricular)
-            //   2° peso del cuatrimestre ASC  (PRIMER/ANUAL=1, SEGUNDO=2, VERANO=3)
-            //   3° m.nombre ASC               (desempate alfabético)
-            List<Map> rows = Base.findAll(
-                "SELECT"
-                + "    m.codigo"
-                + "  , m.nombre"
-                + "  , m.anio_cursada"
-                + "  , mp_plan.tipo_cuatrimestre"
-                + "  , ea.estado"
-                + "  , ("
-                + "        SELECT n.valor"
-                + "        FROM Nota n"
-                + "        JOIN Materia_Periodo mp ON mp.id = n.materia_periodo_id"
-                + "        WHERE mp.materia_codigo = m.codigo"
-                + "          AND n.student_id      = ?"
-                + "        ORDER BY n.fecha_carga DESC"
-                + "        LIMIT 1"
-                + "    ) AS nota"
-                + " FROM Materia m"
-                + " LEFT JOIN Materia_Periodo mp_plan"
-                + "        ON mp_plan.materia_codigo = m.codigo"
-                + "       AND mp_plan.id = ("
-                + "               SELECT MIN(id)"
-                + "               FROM Materia_Periodo"
-                + "               WHERE materia_codigo = m.codigo"
-                + "           )"
-                + " LEFT JOIN Estado_Academico ea"
-                + "        ON ea.materia_codigo = m.codigo"
-                + "       AND ea.usuario_id     = ?"
-                + " WHERE m.plan_estudio_id = ?"
-                + " ORDER BY m.anio_cursada ASC"
-                + "        , CASE mp_plan.tipo_cuatrimestre"
-                + "              WHEN 'PRIMER_CUATRIMESTRE'  THEN 1"
-                + "              WHEN 'ANUAL'                THEN 1"
-                + "              WHEN 'SEGUNDO_CUATRIMESTRE' THEN 2"
-                + "              WHEN 'VERANO'               THEN 3"
-                + "              ELSE 4"
-                + "          END ASC"
-                + "        , m.nombre ASC",
-                userId, userId, planEstudioId
-            );
-
-            // ── 4. Transformar filas para Mustache ────────────────────────────────────
-            List<Map<String, Object>> materias      = new ArrayList<>();
-            String                    grupoAnterior = "";
-
-            for (Map row : rows) {
-                Map<String, Object> item = new HashMap<>();
-
-                item.put("codigo",       row.get("codigo"));
-                item.put("nombre",       row.get("nombre"));
-                item.put("anio_cursada", row.get("anio_cursada"));
-
-                // Estado: "-" si la materia nunca fue cursada (LEFT JOIN → NULL)
-                String estado = (String) row.get("estado");
-                item.put("estado", estado != null ? estado : "-");
-
-                // Nota: DECIMAL(5,2) llega como BigDecimal. Sin nota → "-".
-                Object notaVal = row.get("nota");
-                if (notaVal != null) {
-                    java.math.BigDecimal bd = new java.math.BigDecimal(notaVal.toString());
-                    item.put("nota", bd.stripTrailingZeros().toPlainString());
-                } else {
-                    item.put("nota", "-");
+                if (!"ESTUDIANTE".equals(userRole) || userIdObj == null) {
+                    res.redirect(
+                        "/login?error=" +
+                            URLEncoder.encode(
+                                "Acceso restringido a estudiantes.",
+                                StandardCharsets.UTF_8.toString()
+                            )
+                    );
+                    return null;
                 }
 
-                // Badge CSS — precomputado porque Mustache es logic-less.
-                String estadoClase;
-                switch (estado != null ? estado : "") {
-                    case "APROBADO":
-                        estadoClase = "bg-green-500/20 text-green-300 border-green-500/40";
-                        break;
-                    case "PROMOCION":
-                        estadoClase = "bg-yellow-400/20 text-yellow-200 border-yellow-400/40";
-                        break;
-                    case "REGULAR":
-                        estadoClase = "bg-blue-500/20 text-blue-300 border-blue-500/40";
-                        break;
-                    case "INSCRIPTO":
-                        estadoClase = "bg-purple-500/20 text-purple-300 border-purple-500/40";
-                        break;
-                    case "REPROBADO":
-                        estadoClase = "bg-red-500/20 text-red-300 border-red-500/40";
-                        break;
-                    case "LIBRE":
-                        estadoClase = "bg-orange-500/20 text-orange-300 border-orange-500/40";
-                        break;
-                    default:
-                        estadoClase = "bg-white/5 text-white/30 border-white/10";
-                        break;
+                int userId = ((Number) userIdObj).intValue();
+
+                Map<String, Object> model = new HashMap<>();
+
+                // ── 2. Obtener plan_estudio_id y etiqueta del plan ────────────────────────
+                List<Map> studentRows = Base.findAll(
+                    "SELECT" +
+                        "    s.plan_estudio_id" +
+                        "  , c.nombre          AS nombre_carrera" +
+                        "  , p.anio_resolucion" +
+                        " FROM student s" +
+                        " JOIN Plan_Estudio p ON p.id = s.plan_estudio_id" +
+                        " JOIN Carrera c      ON c.id = p.carrera_id" +
+                        " WHERE s.usuario_id = ?",
+                    userId
+                );
+
+                if (studentRows.isEmpty()) {
+                    model.put(
+                        "errorMessage",
+                        "No se encontraron datos de tu cuenta de estudiante."
+                    );
+                    return new ModelAndView(
+                        model,
+                        "historia_academica.mustache"
+                    );
                 }
-                item.put("estadoClase", estadoClase);
 
-                // anioHeader: mismo formato periodo_vista de GET /carrera/materias.
-                // Ejemplo: "1° Año - I Cuat.", "1° Año - II Cuat.", "2° Año - Anual"
-                // Se emite solo en la primera materia de cada grupo año+cuatrimestre.
-                int    anio         = ((Number) row.get("anio_cursada")).intValue();
-                String cuatrimestre = row.get("tipo_cuatrimestre") != null
-                                    ? (String) row.get("tipo_cuatrimestre")
-                                    : "PRIMER_CUATRIMESTRE";
-                String grupoActual  = anio + "_" + cuatrimestre;
+                Map studentRow = studentRows.get(0);
+                int planEstudioId = (
+                    (Number) studentRow.get("plan_estudio_id")
+                ).intValue();
+                String nombrePlan =
+                    studentRow.get("nombre_carrera") +
+                    " — Plan " +
+                    studentRow.get("anio_resolucion");
+                model.put("nombrePlan", nombrePlan);
 
-                if (!grupoActual.equals(grupoAnterior)) {
-                    String labelCuatri;
-                    switch (cuatrimestre) {
-                        case "PRIMER_CUATRIMESTRE":  labelCuatri = "I Cuat.";  break;
-                        case "SEGUNDO_CUATRIMESTRE": labelCuatri = "II Cuat."; break;
-                        case "ANUAL":                labelCuatri = "Anual";    break;
-                        case "VERANO":               labelCuatri = "Verano";   break;
-                        default:                     labelCuatri = cuatrimestre; break;
+                // ── 3. Materias del plan con estado académico del alumno ──────────────────
+                //
+                // El JOIN a Materia_Periodo replica la lógica de GET /carrera/materias:
+                // se toma el primer Materia_Periodo de cada materia (MIN id) para obtener
+                // el cuatrimestre del plan y ordenar correctamente dentro de cada año.
+                //
+                // ORDER BY:
+                //   1° m.anio_cursada ASC         (año curricular)
+                //   2° peso del cuatrimestre ASC  (PRIMER/ANUAL=1, SEGUNDO=2, VERANO=3)
+                //   3° m.nombre ASC               (desempate alfabético)
+                List<Map> rows = Base.findAll(
+                    "SELECT" +
+                        "    m.codigo" +
+                        "  , m.nombre" +
+                        "  , m.anio_cursada" +
+                        "  , mp_plan.tipo_cuatrimestre" +
+                        "  , ea.estado" +
+                        "  , (" +
+                        "        SELECT n.valor" +
+                        "        FROM Nota n" +
+                        "        JOIN Materia_Periodo mp ON mp.id = n.materia_periodo_id" +
+                        "        WHERE mp.materia_codigo = m.codigo" +
+                        "          AND n.student_id      = ?" +
+                        "        ORDER BY n.fecha_carga DESC" +
+                        "        LIMIT 1" +
+                        "    ) AS nota" +
+                        " FROM Materia m" +
+                        " LEFT JOIN Materia_Periodo mp_plan" +
+                        "        ON mp_plan.materia_codigo = m.codigo" +
+                        "       AND mp_plan.id = (" +
+                        "               SELECT MIN(id)" +
+                        "               FROM Materia_Periodo" +
+                        "               WHERE materia_codigo = m.codigo" +
+                        "           )" +
+                        " LEFT JOIN Estado_Academico ea" +
+                        "        ON ea.materia_codigo = m.codigo" +
+                        "       AND ea.usuario_id     = ?" +
+                        " WHERE m.plan_estudio_id = ?" +
+                        " ORDER BY m.anio_cursada ASC" +
+                        "        , CASE mp_plan.tipo_cuatrimestre" +
+                        "              WHEN 'PRIMER_CUATRIMESTRE'  THEN 1" +
+                        "              WHEN 'ANUAL'                THEN 1" +
+                        "              WHEN 'SEGUNDO_CUATRIMESTRE' THEN 2" +
+                        "              WHEN 'VERANO'               THEN 3" +
+                        "              ELSE 4" +
+                        "          END ASC" +
+                        "        , m.nombre ASC",
+                    userId,
+                    userId,
+                    planEstudioId
+                );
+
+                // ── 4. Transformar filas para Mustache ────────────────────────────────────
+                List<Map<String, Object>> materias = new ArrayList<>();
+                String grupoAnterior = "";
+
+                for (Map row : rows) {
+                    Map<String, Object> item = new HashMap<>();
+
+                    item.put("codigo", row.get("codigo"));
+                    item.put("nombre", row.get("nombre"));
+                    item.put("anio_cursada", row.get("anio_cursada"));
+
+                    // Estado: "-" si la materia nunca fue cursada (LEFT JOIN → NULL)
+                    String estado = (String) row.get("estado");
+                    item.put("estado", estado != null ? estado : "-");
+
+                    // Nota: DECIMAL(5,2) llega como BigDecimal. Sin nota → "-".
+                    Object notaVal = row.get("nota");
+                    if (notaVal != null) {
+                        java.math.BigDecimal bd = new java.math.BigDecimal(
+                            notaVal.toString()
+                        );
+                        item.put(
+                            "nota",
+                            bd.stripTrailingZeros().toPlainString()
+                        );
+                    } else {
+                        item.put("nota", "-");
                     }
-                    item.put("anioHeader", anio + "° Año - " + labelCuatri);
-                    grupoAnterior = grupoActual;
+
+                    // Badge CSS — precomputado porque Mustache es logic-less.
+                    String estadoClase;
+                    switch (estado != null ? estado : "") {
+                        case "APROBADO":
+                            estadoClase =
+                                "bg-green-500/20 text-green-300 border-green-500/40";
+                            break;
+                        case "PROMOCION":
+                            estadoClase =
+                                "bg-yellow-400/20 text-yellow-200 border-yellow-400/40";
+                            break;
+                        case "REGULAR":
+                            estadoClase =
+                                "bg-blue-500/20 text-blue-300 border-blue-500/40";
+                            break;
+                        case "INSCRIPTO":
+                            estadoClase =
+                                "bg-purple-500/20 text-purple-300 border-purple-500/40";
+                            break;
+                        case "REPROBADO":
+                            estadoClase =
+                                "bg-red-500/20 text-red-300 border-red-500/40";
+                            break;
+                        case "LIBRE":
+                            estadoClase =
+                                "bg-orange-500/20 text-orange-300 border-orange-500/40";
+                            break;
+                        default:
+                            estadoClase =
+                                "bg-white/5 text-white/30 border-white/10";
+                            break;
+                    }
+                    item.put("estadoClase", estadoClase);
+
+                    // anioHeader: mismo formato periodo_vista de GET /carrera/materias.
+                    // Ejemplo: "1° Año - I Cuat.", "1° Año - II Cuat.", "2° Año - Anual"
+                    // Se emite solo en la primera materia de cada grupo año+cuatrimestre.
+                    int anio = ((Number) row.get("anio_cursada")).intValue();
+                    String cuatrimestre =
+                        row.get("tipo_cuatrimestre") != null
+                            ? (String) row.get("tipo_cuatrimestre")
+                            : "PRIMER_CUATRIMESTRE";
+                    String grupoActual = anio + "_" + cuatrimestre;
+
+                    if (!grupoActual.equals(grupoAnterior)) {
+                        String labelCuatri;
+                        switch (cuatrimestre) {
+                            case "PRIMER_CUATRIMESTRE":
+                                labelCuatri = "I Cuat.";
+                                break;
+                            case "SEGUNDO_CUATRIMESTRE":
+                                labelCuatri = "II Cuat.";
+                                break;
+                            case "ANUAL":
+                                labelCuatri = "Anual";
+                                break;
+                            case "VERANO":
+                                labelCuatri = "Verano";
+                                break;
+                            default:
+                                labelCuatri = cuatrimestre;
+                                break;
+                        }
+                        item.put("anioHeader", anio + "° Año - " + labelCuatri);
+                        grupoAnterior = grupoActual;
+                    }
+
+                    materias.add(item);
                 }
 
-                materias.add(item);
-            }
-
-            model.put("materias", materias);
-            return new ModelAndView(model, "historia_academica.mustache");
-
-        }, new MustacheTemplateEngine());
+                model.put("materias", materias);
+                return new ModelAndView(model, "historia_academica.mustache");
+            },
+            new MustacheTemplateEngine()
+        );
 
         // ==========================================
         // GESTIÓN DE SECRETARIOS
@@ -907,7 +916,10 @@ public class App {
                     errorMessage
                 );
 
-                return new ModelAndView(model, "secretariaAcademica_form.mustache");
+                return new ModelAndView(
+                    model,
+                    "secretariaAcademica_form.mustache"
+                );
             },
             new MustacheTemplateEngine()
         );
@@ -979,24 +991,41 @@ public class App {
         // ==========================================
         // GESTIÓN DE CARRERAS Y PLANES DE ESTUDIO
         // ==========================================
-        get("/carrera/new", (req, res) -> {
-            String userRole = req.session().attribute("userRole");
-            if (userRole == null || (!userRole.equals("ADMIN") && !userRole.equals("SECRETARIA"))) {
-                res.redirect("/dashboard");
-                return null;
-            }
-            Map<String, Object> model = new HashMap<>();
-            String successMessage = req.queryParams("message");
-            String errorMessage = req.queryParams("error");
-            if (successMessage != null) model.put("successMessage", successMessage);
-            if (errorMessage != null) model.put("errorMessage", errorMessage);
-            
-            return new ModelAndView(model, "carrera_form.mustache");
-        }, new MustacheTemplateEngine());
+        get(
+            "/carrera/new",
+            (req, res) -> {
+                String userRole = req.session().attribute("userRole");
+                if (
+                    userRole == null ||
+                    (!userRole.equals("ADMIN") &&
+                        !userRole.equals("SECRETARIA"))
+                ) {
+                    res.redirect("/dashboard");
+                    return null;
+                }
+                Map<String, Object> model = new HashMap<>();
+                String successMessage = req.queryParams("message");
+                String errorMessage = req.queryParams("error");
+                if (successMessage != null) model.put(
+                    "successMessage",
+                    successMessage
+                );
+                if (errorMessage != null) model.put(
+                    "errorMessage",
+                    errorMessage
+                );
+
+                return new ModelAndView(model, "carrera_form.mustache");
+            },
+            new MustacheTemplateEngine()
+        );
 
         post("/carrera/new", (req, res) -> {
             String userRole = req.session().attribute("userRole");
-            if (userRole == null || (!userRole.equals("ADMIN") && !userRole.equals("SECRETARIA"))) {
+            if (
+                userRole == null ||
+                (!userRole.equals("ADMIN") && !userRole.equals("SECRETARIA"))
+            ) {
                 res.status(403);
                 return "Acceso denegado.";
             }
@@ -1009,9 +1038,22 @@ public class App {
             String estado = req.queryParams("estado");
 
             // Validación rigurosa de nulidad y vacíos
-            if (nombre == null || duracionAnios == null || tituloOtorgado == null || anioResolucion == null || estado == null ||
-                nombre.isBlank() || duracionAnios.isBlank() || tituloOtorgado.isBlank() || anioResolucion.isBlank() || estado.isBlank()) {
-                String errorMsg = URLEncoder.encode("Todos los campos obligatorios deben completarse.", StandardCharsets.UTF_8.toString());
+            if (
+                nombre == null ||
+                duracionAnios == null ||
+                tituloOtorgado == null ||
+                anioResolucion == null ||
+                estado == null ||
+                nombre.isBlank() ||
+                duracionAnios.isBlank() ||
+                tituloOtorgado.isBlank() ||
+                anioResolucion.isBlank() ||
+                estado.isBlank()
+            ) {
+                String errorMsg = URLEncoder.encode(
+                    "Todos los campos obligatorios deben completarse.",
+                    StandardCharsets.UTF_8.toString()
+                );
                 res.redirect("/carrera/new?error=" + errorMsg);
                 return "";
             }
@@ -1037,15 +1079,22 @@ public class App {
                 // Confirmamos los cambios en la BD
                 Base.commitTransaction();
 
-                String successMsg = URLEncoder.encode("Carrera '" + nombre + "' y Plan inicial registrados con éxito.", StandardCharsets.UTF_8.toString());
+                String successMsg = URLEncoder.encode(
+                    "Carrera '" +
+                        nombre +
+                        "' y Plan inicial registrados con éxito.",
+                    StandardCharsets.UTF_8.toString()
+                );
                 res.redirect("/carrera/new?message=" + successMsg);
                 return "";
-
             } catch (Exception e) {
                 // Si algo falla (ej: violación de restricción UNIQUE en el nombre de carrera), cancelamos todo
                 Base.rollbackTransaction();
                 e.printStackTrace();
-                String errorMsg = URLEncoder.encode("Error al procesar el alta. Verifique si el nombre de la carrera ya existe.", StandardCharsets.UTF_8.toString());
+                String errorMsg = URLEncoder.encode(
+                    "Error al procesar el alta. Verifique si el nombre de la carrera ya existe.",
+                    StandardCharsets.UTF_8.toString()
+                );
                 res.redirect("/carrera/new?error=" + errorMsg);
                 return "";
             }
@@ -1054,38 +1103,57 @@ public class App {
         // ==========================================
         // GESTIÓN DE MATERIAS Y CORRELATIVIDADES
         // ==========================================
-        get("/materia/new", (req, res) -> {
-            String userRole = req.session().attribute("userRole");
-            if (userRole == null || (!userRole.equals("ADMIN") && !userRole.equals("SECRETARIA"))) {
-                res.redirect("/dashboard");
-                return null;
-            }
+        get(
+            "/materia/new",
+            (req, res) -> {
+                String userRole = req.session().attribute("userRole");
+                if (
+                    userRole == null ||
+                    (!userRole.equals("ADMIN") &&
+                        !userRole.equals("SECRETARIA"))
+                ) {
+                    res.redirect("/dashboard");
+                    return null;
+                }
 
-            Map<String, Object> model = new HashMap<>();
-            
-            // Consulta SQL limpia para armar el selector dinámico de Carreras con sus respectivos Planes Vigentes
-            List<Map> planesDropdown = Base.findAll(
-                "SELECT p.id as id, CONCAT(c.nombre, ' (Plan Resol: ', p.anio_resolucion, ')') as descripcion " +
-                "FROM Plan_Estudio p JOIN Carrera c ON p.carrera_id = c.id WHERE p.estado = 'VIGENTE' ORDER BY c.nombre ASC"
-            );
-            
-            // Traemos las materias cargadas para poblar el mapa de correlatividades recursivo
-            List<Map> materiasExistentes = Base.findAll("SELECT codigo, nombre FROM Materia ORDER BY codigo ASC");
+                Map<String, Object> model = new HashMap<>();
 
-            model.put("planes", planesDropdown);
-            model.put("materiasExistentes", materiasExistentes);
+                // Consulta SQL limpia para armar el selector dinámico de Carreras con sus respectivos Planes Vigentes
+                List<Map> planesDropdown = Base.findAll(
+                    "SELECT p.id as id, CONCAT(c.nombre, ' (Plan Resol: ', p.anio_resolucion, ')') as descripcion " +
+                        "FROM Plan_Estudio p JOIN Carrera c ON p.carrera_id = c.id WHERE p.estado = 'VIGENTE' ORDER BY c.nombre ASC"
+                );
 
-            String successMessage = req.queryParams("message");
-            String errorMessage = req.queryParams("error");
-            if (successMessage != null) model.put("successMessage", successMessage);
-            if (errorMessage != null) model.put("errorMessage", errorMessage);
-            
-            return new ModelAndView(model, "materia_form.mustache");
-        }, new MustacheTemplateEngine());
+                // Traemos las materias cargadas para poblar el mapa de correlatividades recursivo
+                List<Map> materiasExistentes = Base.findAll(
+                    "SELECT codigo, nombre FROM Materia ORDER BY codigo ASC"
+                );
+
+                model.put("planes", planesDropdown);
+                model.put("materiasExistentes", materiasExistentes);
+
+                String successMessage = req.queryParams("message");
+                String errorMessage = req.queryParams("error");
+                if (successMessage != null) model.put(
+                    "successMessage",
+                    successMessage
+                );
+                if (errorMessage != null) model.put(
+                    "errorMessage",
+                    errorMessage
+                );
+
+                return new ModelAndView(model, "materia_form.mustache");
+            },
+            new MustacheTemplateEngine()
+        );
 
         post("/materia/new", (req, res) -> {
             String userRole = req.session().attribute("userRole");
-            if (userRole == null || (!userRole.equals("ADMIN") && !userRole.equals("SECRETARIA"))) {
+            if (
+                userRole == null ||
+                (!userRole.equals("ADMIN") && !userRole.equals("SECRETARIA"))
+            ) {
                 res.status(403);
                 return "Acceso denegado.";
             }
@@ -1097,14 +1165,27 @@ public class App {
             String anioCursada = req.queryParams("anio_cursada");
             String cargaHorariaTotal = req.queryParams("carga_horaria_total");
             String tipoCuatrimestre = req.queryParams("tipo_cuatrimestre");
-            
-            
-            String sentidoCorrelatividad = req.queryParams("sentido_correlatividad");
+
+            String sentidoCorrelatividad = req.queryParams(
+                "sentido_correlatividad"
+            );
             String condicion = req.queryParams("condicion");
 
-            if (codigoStr == null || planEstudioId == null || nombre == null || anioCursada == null || tipoCuatrimestre == null ||
-                codigoStr.isBlank() || planEstudioId.isBlank() || nombre.isBlank() || anioCursada.isBlank()) {
-                String errorMsg = URLEncoder.encode("Error: Complete todos los campos obligatorios.", StandardCharsets.UTF_8.toString());
+            if (
+                codigoStr == null ||
+                planEstudioId == null ||
+                nombre == null ||
+                anioCursada == null ||
+                tipoCuatrimestre == null ||
+                codigoStr.isBlank() ||
+                planEstudioId.isBlank() ||
+                nombre.isBlank() ||
+                anioCursada.isBlank()
+            ) {
+                String errorMsg = URLEncoder.encode(
+                    "Error: Complete todos los campos obligatorios.",
+                    StandardCharsets.UTF_8.toString()
+                );
                 res.redirect("/materia/new?error=" + errorMsg);
                 return "";
             }
@@ -1114,34 +1195,53 @@ public class App {
                 int codigoNumerico = Integer.parseInt(codigoStr.trim());
 
                 if (codigoNumerico < 0) {
-                    throw new IllegalArgumentException("El código de la materia no puede ser un número negativo.");
+                    throw new IllegalArgumentException(
+                        "El código de la materia no puede ser un número negativo."
+                    );
                 }
 
                 int anioPropuestoMateria = Integer.parseInt(anioCursada.trim());
-                
+
                 Base.openTransaction();
 
                 // Validaciones de regla de negocio
                 PlanEstudio plan = PlanEstudio.findById(planEstudioId);
-                if (plan == null) throw new IllegalArgumentException("El Plan de Estudio seleccionado no existe.");
-                
+                if (plan == null) throw new IllegalArgumentException(
+                    "El Plan de Estudio seleccionado no existe."
+                );
+
                 Carrera carrera = Carrera.findById(plan.get("carrera_id"));
                 int maxAniosCarrera = carrera.getInteger("duracion_anios");
 
                 if (anioPropuestoMateria > maxAniosCarrera) {
-                    throw new IllegalArgumentException("No se puede asignar a " + anioPropuestoMateria + "° año. La carrera '" + carrera.get("nombre") + "' dura " + maxAniosCarrera + " años.");
+                    throw new IllegalArgumentException(
+                        "No se puede asignar a " +
+                            anioPropuestoMateria +
+                            "° año. La carrera '" +
+                            carrera.get("nombre") +
+                            "' dura " +
+                            maxAniosCarrera +
+                            " años."
+                    );
                 }
 
                 // Tarea A: Guardar Materia con PK numérica
                 if (cargaHorariaTotal != null && !cargaHorariaTotal.isBlank()) {
                     Base.exec(
                         "INSERT INTO Materia (codigo, plan_estudio_id, nombre, anio_cursada, carga_horaria_total) VALUES (?, ?, ?, ?, ?)",
-                        codigoNumerico, Integer.parseInt(planEstudioId), nombre, anioPropuestoMateria, Integer.parseInt(cargaHorariaTotal)
+                        codigoNumerico,
+                        Integer.parseInt(planEstudioId),
+                        nombre,
+                        anioPropuestoMateria,
+                        Integer.parseInt(cargaHorariaTotal)
                     );
                 } else {
                     Base.exec(
                         "INSERT INTO Materia (codigo, plan_estudio_id, nombre, anio_cursada) VALUES (?, ?, ?, ?)",
-                        codigoNumerico, Integer.parseInt(planEstudioId), nombre, anioPropuestoMateria
+                        codigoNumerico,
+                        Integer.parseInt(planEstudioId),
+                        nombre,
+                        anioPropuestoMateria
                     );
                 }
 
@@ -1155,37 +1255,63 @@ public class App {
 
                 // Tarea C: Correlatividad
                 // 1. En lugar de queryParams (String), usamos queryParamsValues (Array de Strings)
-                String[] correlativas = req.queryParamsValues("materia_correlativa_codigo");
-                String[] tiposRequisito = req.queryParamsValues("tipo_requisito");
+                String[] correlativas = req.queryParamsValues(
+                    "materia_correlativa_codigo"
+                );
+                String[] tiposRequisito = req.queryParamsValues(
+                    "tipo_requisito"
+                );
                 String[] condiciones = req.queryParamsValues("condicion");
-                String[] sentidos = req.queryParamsValues("sentido_correlatividad");
+                String[] sentidos = req.queryParamsValues(
+                    "sentido_correlatividad"
+                );
 
                 // 2. Si llegaron datos, los recorremos uno por uno con un bucle FOR
                 if (correlativas != null) {
                     for (int i = 0; i < correlativas.length; i++) {
-                        
                         // Si en esta fila dejaron "-- Ninguna --", la saltamos y seguimos con la siguiente
-                        if (correlativas[i].equals("none")) continue; 
+                        if (correlativas[i].equals("none")) continue;
 
                         // Extraemos los datos específicos de la fila actual del bucle
-                        int seleccionadaCodigo = Integer.parseInt(correlativas[i].trim());
+                        int seleccionadaCodigo = Integer.parseInt(
+                            correlativas[i].trim()
+                        );
                         String tipoReq = tiposRequisito[i];
                         String condicionActual = condiciones[i];
                         String sentidoCorr = sentidos[i];
 
                         if (codigoNumerico == seleccionadaCodigo) {
-                            throw new IllegalArgumentException("Una asignatura no puede ser correlativa de sí misma.");
+                            throw new IllegalArgumentException(
+                                "Una asignatura no puede ser correlativa de sí misma."
+                            );
                         }
 
-                        Materia materiaExistente = Materia.findFirst("codigo = ?", seleccionadaCodigo);
-                        MateriaPeriodo periodoExistente = MateriaPeriodo.findFirst("materia_codigo = ?", seleccionadaCodigo);
+                        Materia materiaExistente = Materia.findFirst(
+                            "codigo = ?",
+                            seleccionadaCodigo
+                        );
+                        MateriaPeriodo periodoExistente =
+                            MateriaPeriodo.findFirst(
+                                "materia_codigo = ?",
+                                seleccionadaCodigo
+                            );
 
-                        if (materiaExistente == null || periodoExistente == null) {
-                            throw new IllegalArgumentException("La materia correlativa " + seleccionadaCodigo + " no es válida.");
+                        if (
+                            materiaExistente == null || periodoExistente == null
+                        ) {
+                            throw new IllegalArgumentException(
+                                "La materia correlativa " +
+                                    seleccionadaCodigo +
+                                    " no es válida."
+                            );
                         }
 
-                        int anioExistente = materiaExistente.getInteger("anio_cursada");
-                        String cuatExistente = periodoExistente.getString("tipo_cuatrimestre");
+                        int anioExistente = materiaExistente.getInteger(
+                            "anio_cursada"
+                        );
+                        String cuatExistente = periodoExistente.getString(
+                            "tipo_cuatrimestre"
+                        );
 
                         int anioRequisito, anioObjetivo;
                         String cuatRequisito, cuatObjetivo;
@@ -1202,13 +1328,21 @@ public class App {
                             cuatObjetivo = cuatExistente;
                         }
 
-                        java.util.function.Function<String, Integer> pesoCuatrimestre = (c) -> {
+                        java.util.function.Function<
+                            String,
+                            Integer
+                        > pesoCuatrimestre = c -> {
                             switch (c) {
-                                case "PRIMER_CUATRIMESTRE": return 1;
-                                case "ANUAL": return 1;
-                                case "SEGUNDO_CUATRIMESTRE": return 2;
-                                case "VERANO": return 3;
-                                default: return 0;
+                                case "PRIMER_CUATRIMESTRE":
+                                    return 1;
+                                case "ANUAL":
+                                    return 1;
+                                case "SEGUNDO_CUATRIMESTRE":
+                                    return 2;
+                                case "VERANO":
+                                    return 3;
+                                default:
+                                    return 0;
                             }
                         };
 
@@ -1216,35 +1350,52 @@ public class App {
                         int pesoObj = pesoCuatrimestre.apply(cuatObjetivo);
 
                         if (anioRequisito > anioObjetivo) {
-                            throw new IllegalArgumentException("Inconsistencia Temporal: El requisito pertenece a un año superior.");
-                        } else if (anioRequisito == anioObjetivo && pesoReq >= pesoObj) {
-                            throw new IllegalArgumentException("Inconsistencia Temporal: El requisito se dicta en paralelo o posterior en el mismo año.");
+                            throw new IllegalArgumentException(
+                                "Inconsistencia Temporal: El requisito pertenece a un año superior."
+                            );
+                        } else if (
+                            anioRequisito == anioObjetivo && pesoReq >= pesoObj
+                        ) {
+                            throw new IllegalArgumentException(
+                                "Inconsistencia Temporal: El requisito se dicta en paralelo o posterior en el mismo año."
+                            );
                         }
 
                         // 3. Insertamos en la Base de Datos con los 4 parámetros (incluyendo tipoReq)
                         if ("REQUIERE".equals(sentidoCorr)) {
                             Base.exec(
                                 "INSERT INTO Correlatividad (materia_codigo, materia_correlativa_codigo, condicion, tipo_requisito) VALUES (?, ?, ?, ?)",
-                                codigoNumerico, seleccionadaCodigo, condicionActual, tipoReq
+                                codigoNumerico,
+                                seleccionadaCodigo,
+                                condicionActual,
+                                tipoReq
                             );
                         } else if ("ES_REQUISITO".equals(sentidoCorr)) {
                             Base.exec(
                                 "INSERT INTO Correlatividad (materia_codigo, materia_correlativa_codigo, condicion, tipo_requisito) VALUES (?, ?, ?, ?)",
-                                seleccionadaCodigo, codigoNumerico, condicionActual, tipoReq
+                                seleccionadaCodigo,
+                                codigoNumerico,
+                                condicionActual,
+                                tipoReq
                             );
                         }
-                    } 
+                    }
                 }
 
                 Base.commitTransaction();
-                String successMsg = URLEncoder.encode("Materia [" + codigoNumerico + "] registrada con éxito.", StandardCharsets.UTF_8.toString());
+                String successMsg = URLEncoder.encode(
+                    "Materia [" + codigoNumerico + "] registrada con éxito.",
+                    StandardCharsets.UTF_8.toString()
+                );
                 res.redirect("/materia/new?message=" + successMsg);
                 return "";
-
             } catch (Exception e) {
                 Base.rollbackTransaction();
                 e.printStackTrace();
-                String errorMsg = URLEncoder.encode("Error: " + e.getMessage(), StandardCharsets.UTF_8.toString());
+                String errorMsg = URLEncoder.encode(
+                    "Error: " + e.getMessage(),
+                    StandardCharsets.UTF_8.toString()
+                );
                 res.redirect("/materia/new?error=" + errorMsg);
                 return "";
             }
@@ -1253,104 +1404,138 @@ public class App {
         // ==========================================
         // VISTA DE PLAN DE ESTUDIOS (GRILLA)
         // ==========================================
-        get("/carrera/materias", (req, res) -> {
-            if (req.session().attribute("userRole") == null) {
-                res.redirect("/login");
-                return null;
-            }
-
-            Map<String, Object> model = new HashMap<>();
-
-            // 1. Cargamos el selector de planes vigentes
-            List<Map> planesDropdown = Base.findAll(
-                "SELECT p.id as id, CONCAT(c.nombre, ' (Plan Resol: ', p.anio_resolucion, ')') as descripcion " +
-                "FROM Plan_Estudio p JOIN Carrera c ON p.carrera_id = c.id WHERE p.estado = 'VIGENTE' ORDER BY c.nombre ASC"
-            );
-            model.put("planes", planesDropdown);
-
-            // 2. Si se mandó un plan por la URL, buscamos sus materias asignadas
-            String planIdParam = req.queryParams("plan_id");
-            if (planIdParam != null && !planIdParam.isBlank()) {
-                int planId = Integer.parseInt(planIdParam.trim());
-
-                // Buscamos las materias asociadas ordenadas cronológicamente por año y cuatrimestre
-                List<Map> materiasRaw = Base.findAll(
-                    "SELECT m.codigo, m.nombre, m.anio_cursada, mp.tipo_cuatrimestre " +
-                    "FROM Materia m " +
-                    "JOIN Materia_Periodo mp ON m.codigo = mp.materia_codigo " +
-                    "WHERE m.plan_estudio_id = ? " +
-                    "ORDER BY m.anio_cursada ASC, " +
-                    "CASE mp.tipo_cuatrimestre " +
-                    "  WHEN 'PRIMER_CUATRIMESTRE' THEN 1 " +
-                    "  WHEN 'ANUAL' THEN 2 " +
-                    "  WHEN 'SEGUNDO_CUATRIMESTRE' THEN 3 " +
-                    "  WHEN 'VERANO' THEN 4 " +
-                    "  ELSE 5 " +
-                    "END ASC, m.nombre ASC",
-                    planId
-                );
-
-                List<Map<String, Object>> materiasProcesadas = new java.util.ArrayList<>();
-
-                for (Map mat : materiasRaw) {
-                    Map<String, Object> mDto = new HashMap<>(mat);
-                    int mCodigo = (int) mat.get("codigo");
-
-                    // Formateamos visualmente el año y cuatrimestre para la primera columna
-                    String cuatRaw = (String) mat.get("tipo_cuatrimestre");
-                    String cuatVista = cuatRaw;
-                    if ("PRIMER_CUATRIMESTRE".equals(cuatRaw)) cuatVista = "I Cuat.";
-                    else if ("SEGUNDO_CUATRIMESTRE".equals(cuatRaw)) cuatVista = "II Cuat.";
-                    else if ("ANUAL".equals(cuatRaw)) cuatVista = "Anual";
-                    else if ("VERANO".equals(cuatRaw)) cuatVista = "Verano";
-
-                    mDto.put("periodo_vista", mat.get("anio_cursada") + "° Año - " + cuatVista);
-
-                    // Buscamos las correlatividades de esta asignatura concreta (AHORA INCLUYE TIPO REQUISITO)
-                    List<Map> corrs = Base.findAll(
-                        "SELECT materia_correlativa_codigo, condicion, tipo_requisito FROM Correlatividad WHERE materia_codigo = ?",
-                        mCodigo
-                    );
-
-                    StringBuilder aprobadasC = new StringBuilder(); // Para CURSAR (Aprobada)
-                    StringBuilder regularesC = new StringBuilder(); // Para CURSAR (Regular)
-                    StringBuilder aprobadasR = new StringBuilder(); // Para RENDIR (Aprobada)
-
-                    for (Map c : corrs) {
-                        int corrCod = (int) c.get("materia_correlativa_codigo");
-                        String cond = (String) c.get("condicion");
-                        String tipoReq = (String) c.get("tipo_requisito"); // Capturamos la nueva columna
-
-                        if ("RENDIR".equals(tipoReq)) {
-                            if (aprobadasR.length() > 0) aprobadasR.append(", ");
-                            aprobadasR.append(corrCod);
-                        } else {
-                            // Si es para CURSAR, evaluamos la condición
-                            if ("APROBADA".equals(cond)) {
-                                if (aprobadasC.length() > 0) aprobadasC.append(", ");
-                                aprobadasC.append(corrCod);
-                            } else {
-                                if (regularesC.length() > 0) regularesC.append(", ");
-                                regularesC.append(corrCod);
-                            }
-                        }
-                    }
-
-                    // Guardamos las 3 variables separadas para que Mustache arme las columnas
-                    mDto.put("correlativas_aprobadas", aprobadasC.length() > 0 ? aprobadasC.toString() : "-");
-                    mDto.put("correlativas_regulares", regularesC.length() > 0 ? regularesC.toString() : "-");
-                    mDto.put("correlativas_rendir", aprobadasR.length() > 0 ? aprobadasR.toString() : "-");
-
-                    materiasProcesadas.add(mDto);
+        get(
+            "/carrera/materias",
+            (req, res) -> {
+                if (req.session().attribute("userRole") == null) {
+                    res.redirect("/login");
+                    return null;
                 }
 
-                model.put("materias", materiasProcesadas);
-                model.put("mostrarTabla", !materiasProcesadas.isEmpty());
-                model.put("sinMaterias", materiasProcesadas.isEmpty());
-            }
+                Map<String, Object> model = new HashMap<>();
 
-            return new ModelAndView(model, "materias_list.mustache");
-        }, new MustacheTemplateEngine());
+                // 1. Cargamos el selector de planes vigentes
+                List<Map> planesDropdown = Base.findAll(
+                    "SELECT p.id as id, CONCAT(c.nombre, ' (Plan Resol: ', p.anio_resolucion, ')') as descripcion " +
+                        "FROM Plan_Estudio p JOIN Carrera c ON p.carrera_id = c.id WHERE p.estado = 'VIGENTE' ORDER BY c.nombre ASC"
+                );
+                model.put("planes", planesDropdown);
+
+                // 2. Si se mandó un plan por la URL, buscamos sus materias asignadas
+                String planIdParam = req.queryParams("plan_id");
+                if (planIdParam != null && !planIdParam.isBlank()) {
+                    int planId = Integer.parseInt(planIdParam.trim());
+
+                    // Buscamos las materias asociadas ordenadas cronológicamente por año y cuatrimestre
+                    List<Map> materiasRaw = Base.findAll(
+                        "SELECT m.codigo, m.nombre, m.anio_cursada, mp.tipo_cuatrimestre " +
+                            "FROM Materia m " +
+                            "JOIN Materia_Periodo mp ON m.codigo = mp.materia_codigo " +
+                            "WHERE m.plan_estudio_id = ? " +
+                            "ORDER BY m.anio_cursada ASC, " +
+                            "CASE mp.tipo_cuatrimestre " +
+                            "  WHEN 'PRIMER_CUATRIMESTRE' THEN 1 " +
+                            "  WHEN 'ANUAL' THEN 2 " +
+                            "  WHEN 'SEGUNDO_CUATRIMESTRE' THEN 3 " +
+                            "  WHEN 'VERANO' THEN 4 " +
+                            "  ELSE 5 " +
+                            "END ASC, m.nombre ASC",
+                        planId
+                    );
+
+                    List<Map<String, Object>> materiasProcesadas =
+                        new java.util.ArrayList<>();
+
+                    for (Map mat : materiasRaw) {
+                        Map<String, Object> mDto = new HashMap<>(mat);
+                        int mCodigo = (int) mat.get("codigo");
+
+                        // Formateamos visualmente el año y cuatrimestre para la primera columna
+                        String cuatRaw = (String) mat.get("tipo_cuatrimestre");
+                        String cuatVista = cuatRaw;
+                        if ("PRIMER_CUATRIMESTRE".equals(cuatRaw)) cuatVista =
+                            "I Cuat.";
+                        else if (
+                            "SEGUNDO_CUATRIMESTRE".equals(cuatRaw)
+                        ) cuatVista = "II Cuat.";
+                        else if ("ANUAL".equals(cuatRaw)) cuatVista = "Anual";
+                        else if ("VERANO".equals(cuatRaw)) cuatVista = "Verano";
+
+                        mDto.put(
+                            "periodo_vista",
+                            mat.get("anio_cursada") + "° Año - " + cuatVista
+                        );
+
+                        // Buscamos las correlatividades de esta asignatura concreta (AHORA INCLUYE TIPO REQUISITO)
+                        List<Map> corrs = Base.findAll(
+                            "SELECT materia_correlativa_codigo, condicion, tipo_requisito FROM Correlatividad WHERE materia_codigo = ?",
+                            mCodigo
+                        );
+
+                        StringBuilder aprobadasC = new StringBuilder(); // Para CURSAR (Aprobada)
+                        StringBuilder regularesC = new StringBuilder(); // Para CURSAR (Regular)
+                        StringBuilder aprobadasR = new StringBuilder(); // Para RENDIR (Aprobada)
+
+                        for (Map c : corrs) {
+                            int corrCod = (int) c.get(
+                                "materia_correlativa_codigo"
+                            );
+                            String cond = (String) c.get("condicion");
+                            String tipoReq = (String) c.get("tipo_requisito"); // Capturamos la nueva columna
+
+                            if ("RENDIR".equals(tipoReq)) {
+                                if (aprobadasR.length() > 0) aprobadasR.append(
+                                    ", "
+                                );
+                                aprobadasR.append(corrCod);
+                            } else {
+                                // Si es para CURSAR, evaluamos la condición
+                                if ("APROBADA".equals(cond)) {
+                                    if (
+                                        aprobadasC.length() > 0
+                                    ) aprobadasC.append(", ");
+                                    aprobadasC.append(corrCod);
+                                } else {
+                                    if (
+                                        regularesC.length() > 0
+                                    ) regularesC.append(", ");
+                                    regularesC.append(corrCod);
+                                }
+                            }
+                        }
+
+                        // Guardamos las 3 variables separadas para que Mustache arme las columnas
+                        mDto.put(
+                            "correlativas_aprobadas",
+                            aprobadasC.length() > 0
+                                ? aprobadasC.toString()
+                                : "-"
+                        );
+                        mDto.put(
+                            "correlativas_regulares",
+                            regularesC.length() > 0
+                                ? regularesC.toString()
+                                : "-"
+                        );
+                        mDto.put(
+                            "correlativas_rendir",
+                            aprobadasR.length() > 0
+                                ? aprobadasR.toString()
+                                : "-"
+                        );
+
+                        materiasProcesadas.add(mDto);
+                    }
+
+                    model.put("materias", materiasProcesadas);
+                    model.put("mostrarTabla", !materiasProcesadas.isEmpty());
+                    model.put("sinMaterias", materiasProcesadas.isEmpty());
+                }
+
+                return new ModelAndView(model, "materias_list.mustache");
+            },
+            new MustacheTemplateEngine()
+        );
 
         post("/teacher/new", (req, res) -> {
             String name = req.queryParams("teacher_name");
@@ -1364,8 +1549,16 @@ public class App {
             String especialidad = req.queryParams("especialidad");
             String carreraId = req.queryParams("carrera_id");
 
-            if (name == null || lastName == null || dni == null || carreraId == null || carreraId.isBlank()) {
-                res.redirect("/teacher/new?error=Los campos Nombre, Apellido, DNI y Carrera son obligatorios.");
+            if (
+                name == null ||
+                lastName == null ||
+                dni == null ||
+                carreraId == null ||
+                carreraId.isBlank()
+            ) {
+                res.redirect(
+                    "/teacher/new?error=Los campos Nombre, Apellido, DNI y Carrera son obligatorios."
+                );
                 return "";
             }
 
@@ -1419,7 +1612,10 @@ public class App {
 
         post("/teacher/assign-materia", (req, res) -> {
             String userRole = req.session().attribute("userRole");
-            if (userRole == null || (!userRole.equals("SECRETARIA") && !userRole.equals("ADMIN"))) {
+            if (
+                userRole == null ||
+                (!userRole.equals("SECRETARIA") && !userRole.equals("ADMIN"))
+            ) {
                 String errorMessage = URLEncoder.encode(
                     "Acceso denegado. Solo SECRETARIA puede asignar materias.",
                     StandardCharsets.UTF_8.toString()
@@ -1449,15 +1645,23 @@ public class App {
                 int teacherId = Integer.parseInt(teacherIdParam);
                 int materiaId = Integer.parseInt(materiaIdParam);
 
-                Teacher teacher = (Teacher) Teacher.findFirst("usuario_id = ?", teacherId);
-                Materia materia = (Materia) Materia.findFirst("codigo = ?", materiaId);
+                Teacher teacher = (Teacher) Teacher.findFirst(
+                    "usuario_id = ?",
+                    teacherId
+                );
+                Materia materia = (Materia) Materia.findFirst(
+                    "codigo = ?",
+                    materiaId
+                );
 
                 if (teacher == null || materia == null) {
                     String errorMessage = URLEncoder.encode(
                         "Docente o materia no válida.",
                         StandardCharsets.UTF_8.toString()
                     );
-                    res.redirect("/teacher/assign-materia?error=" + errorMessage);
+                    res.redirect(
+                        "/teacher/assign-materia?error=" + errorMessage
+                    );
                     return "";
                 }
 
@@ -1472,7 +1676,9 @@ public class App {
                         "Esta asignación ya existe.",
                         StandardCharsets.UTF_8.toString()
                     );
-                    res.redirect("/teacher/assign-materia?error=" + errorMessage);
+                    res.redirect(
+                        "/teacher/assign-materia?error=" + errorMessage
+                    );
                     return "";
                 }
 
@@ -1484,7 +1690,9 @@ public class App {
                     "Materia asignada correctamente al docente.",
                     StandardCharsets.UTF_8.toString()
                 );
-                res.redirect("/teacher/assign-materia?message=" + successMessage);
+                res.redirect(
+                    "/teacher/assign-materia?message=" + successMessage
+                );
                 return "";
             } catch (NumberFormatException e) {
                 String errorMessage = URLEncoder.encode(
@@ -1505,402 +1713,643 @@ public class App {
         });
 
         // ==========================================
-// PANEL DEL DOCENTE — IS-19
-// ==========================================
+        // PANEL DEL DOCENTE — IS-19
+        // ==========================================
 
-// Helper de autorización reutilizable
-// (definido como lambda local al inicio de main, antes del primer get/post)
+        // Helper de autorización reutilizable
+        // (definido como lambda local al inicio de main, antes del primer get/post)
 
-// GET /docente/materias — lista las materias asignadas al docente logueado
-get("/docente/materias", (req, res) -> {
-    String userRole = req.session().attribute("userRole");
-    if (userRole == null || !userRole.equals("DOCENTE")) {
-        res.redirect("/dashboard?error=" + URLEncoder.encode(
-            "Acceso denegado. Solo docentes pueden acceder a esta sección.",
-            StandardCharsets.UTF_8.toString()));
-        return null;
-    }
+        // GET /docente/materias — lista las materias asignadas al docente logueado
+        get(
+            "/docente/materias",
+            (req, res) -> {
+                String userRole = req.session().attribute("userRole");
+                if (userRole == null || !userRole.equals("DOCENTE")) {
+                    res.redirect(
+                        "/dashboard?error=" +
+                            URLEncoder.encode(
+                                "Acceso denegado. Solo docentes pueden acceder a esta sección.",
+                                StandardCharsets.UTF_8.toString()
+                            )
+                    );
+                    return null;
+                }
 
-    Map<String, Object> model = new HashMap<>();
+                Map<String, Object> model = new HashMap<>();
 
-    String successMessage = req.queryParams("message");
-    String errorMessage   = req.queryParams("error");
-    if (successMessage != null && !successMessage.isEmpty()) model.put("successMessage", successMessage);
-    if (errorMessage   != null && !errorMessage.isEmpty())   model.put("errorMessage",   errorMessage);
-
-    // Obtenemos el Teacher a partir del userId guardado en sesión
-    Integer userId = req.session().attribute("userId");
-    Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
-
-    if (teacher == null) {
-        res.redirect("/dashboard?error=" + URLEncoder.encode(
-            "No se encontró un perfil docente para tu usuario.",
-            StandardCharsets.UTF_8.toString()));
-        return null;
-    }
-
-    int teacherId = teacher.getInteger("usuario_id");
-
-    // Buscamos las materias asignadas vía Docente_Materia
-    List<Map> materiasRaw = Base.findAll(
-        "SELECT m.codigo, m.nombre, m.anio_cursada " +
-        "FROM Materia m " +
-        "JOIN Docente_Materia dm ON m.codigo = dm.materia_id " +
-        "WHERE dm.teacher_id = ? " +
-        "ORDER BY m.anio_cursada ASC, m.nombre ASC",
-        teacherId
-    );
-
-    model.put("materias",    materiasRaw);
-    model.put("sinMaterias", materiasRaw.isEmpty());
-
-    return new ModelAndView(model, "docente_materias.mustache");
-}, new MustacheTemplateEngine());
-
-
-// GET /docente/materia/:materiaId — panel de acciones de una materia concreta
-get("/docente/materia/:materiaId", (req, res) -> {
-    String userRole = req.session().attribute("userRole");
-    if (userRole == null || !userRole.equals("DOCENTE")) {
-        res.redirect("/dashboard?error=" + URLEncoder.encode(
-            "Acceso denegado.", StandardCharsets.UTF_8.toString()));
-        return null;
-    }
-
-    Integer userId  = req.session().attribute("userId");
-    Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
-    if (teacher == null) { res.redirect("/dashboard"); return null; }
-
-    int teacherId  = teacher.getInteger("usuario_id");
-    int materiaId;
-    try {
-        materiaId = Integer.parseInt(req.params("materiaId"));
-    } catch (NumberFormatException e) {
-        res.redirect("/docente/materias?error=" + URLEncoder.encode(
-            "Materia inválida.", StandardCharsets.UTF_8.toString()));
-        return null;
-    }
-
-    // Verificamos que la materia le pertenezca al docente
-    DocenteMateria asignacion = DocenteMateria.findFirst(
-        "teacher_id = ? AND materia_id = ?", teacherId, materiaId);
-    if (asignacion == null) {
-        res.redirect("/docente/materias?error=" + URLEncoder.encode(
-            "No tenés acceso a esa materia.", StandardCharsets.UTF_8.toString()));
-        return null;
-    }
-
-    Materia materia = Materia.findFirst("codigo = ?", materiaId);
-    if (materia == null) { res.redirect("/docente/materias"); return null; }
-
-    // Periodo vigente de la materia
-    MateriaPeriodo periodo = MateriaPeriodo.findFirst("materia_codigo = ?", materiaId);
-    String periodoLabel = "";
-    if (periodo != null) {
-        String raw = periodo.getString("tipo_cuatrimestre");
-        if      ("PRIMER_CUATRIMESTRE".equals(raw))  periodoLabel = "I Cuatrimestre";
-        else if ("SEGUNDO_CUATRIMESTRE".equals(raw))  periodoLabel = "II Cuatrimestre";
-        else if ("ANUAL".equals(raw))                 periodoLabel = "Anual";
-        else if ("VERANO".equals(raw))                periodoLabel = "Verano";
-    }
-
-    // Alumnos para el selector de notas (sólo inscriptos o regulares)
-    List<Map> inscriptosRows = Base.findAll(
-        "SELECT u.id as usuario_id, u.nombre, u.apellido, s.legajo " +
-        "FROM users u " +
-        "JOIN student s ON u.id = s.usuario_id " +
-        "JOIN Estado_Academico ea ON s.usuario_id = ea.usuario_id " +
-        "WHERE ea.materia_codigo = ? AND ea.estado IN ('INSCRIPTO', 'REGULAR')",
-        materiaId
-    );
-
-    List<Map<String, Object>> alumnosOptions = new ArrayList<>();
-    for (Map row : inscriptosRows) {
-        String label = row.get("apellido") + ", " + row.get("nombre") + " — " + row.get("legajo");
-        Map<String, Object> opt = new HashMap<>();
-        opt.put("id", row.get("usuario_id"));
-        opt.put("label", label);
-        alumnosOptions.add(opt);
-    }
-
-    Map<String, Object> model = new HashMap<>();
-    model.put("codigoMateria", materiaId);
-    model.put("nombreMateria", materia.getString("nombre"));
-    model.put("anioMateria",   materia.getInteger("anio_cursada"));
-    model.put("periodoMateria", periodoLabel);
-    model.put("alumnos",       alumnosOptions);
-    model.put("hayAlumnos",    !alumnosOptions.isEmpty());
-
-
-    List<Map<String, Object>> anuncios = new ArrayList<>();
-    if (periodo != null) {
-        List<Map> anunciosDB = Base.findAll(
-                "SELECT id, tipo, titulo, contenido, fecha_examen FROM Anuncio WHERE materia_periodo_id = ? ORDER BY fecha_creacion DESC",
-                periodo.getId()
-        );
-        for (Map a : anunciosDB) {
-            Map<String, Object> anuncioMap = new HashMap<>();
-            anuncioMap.put("id",          a.get("id"));
-            anuncioMap.put("tipo",        a.get("tipo"));
-            anuncioMap.put("titulo",      a.get("titulo"));
-            anuncioMap.put("contenido",   a.get("contenido"));
-            anuncioMap.put("fechaExamen", a.get("fecha_examen"));
-            anuncioMap.put("esExamen",    "EXAMEN".equals(a.get("tipo")));
-            if ("EXAMEN".equals(a.get("tipo"))) {
-                List<Map> conteoRows = Base.findAll(
-                        "SELECT COUNT(*) AS total FROM Inscripcion_Parcial WHERE anuncio_id = ?",
-                        ((Number) a.get("id")).intValue()
+                String successMessage = req.queryParams("message");
+                String errorMessage = req.queryParams("error");
+                if (
+                    successMessage != null && !successMessage.isEmpty()
+                ) model.put("successMessage", successMessage);
+                if (errorMessage != null && !errorMessage.isEmpty()) model.put(
+                    "errorMessage",
+                    errorMessage
                 );
-                int total = conteoRows.isEmpty() ? 0 : ((Number) conteoRows.get(0).get("total")).intValue();
-                anuncioMap.put("inscriptosCount", total);
-            }
-            anuncios.add(anuncioMap);
-        }
-    }
-    model.put("anuncios", anuncios);
 
-     // Anuncios del período con contador de inscriptos a parciales
-    List<Map<String, Object>> anunciosConConteo = new ArrayList<>();
-    if (periodo != null) {
-        List<Map> anunciosDB = Base.findAll(
-            "SELECT id, tipo, titulo, contenido, fecha_examen FROM Anuncio WHERE materia_periodo_id = ? ORDER BY fecha_creacion DESC",
-            periodo.getId()
-        );
-        for (Map a : anunciosDB) {
-            Map<String, Object> anuncioMap = new HashMap<>();
-            anuncioMap.put("id",          a.get("id"));
-            anuncioMap.put("tipo",        a.get("tipo"));
-            anuncioMap.put("titulo",      a.get("titulo"));
-            anuncioMap.put("contenido",   a.get("contenido"));
-            anuncioMap.put("fechaExamen", a.get("fecha_examen"));
-            anuncioMap.put("esExamen",    "EXAMEN".equals(a.get("tipo")));
-            if ("EXAMEN".equals(a.get("tipo"))) {
-                List<Map> conteoRows = Base.findAll(
-                    "SELECT COUNT(*) AS total FROM Inscripcion_Parcial WHERE anuncio_id = ?",
-                    ((Number) a.get("id")).intValue()
+                // Obtenemos el Teacher a partir del userId guardado en sesión
+                Integer userId = req.session().attribute("userId");
+                Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
+
+                if (teacher == null) {
+                    res.redirect(
+                        "/dashboard?error=" +
+                            URLEncoder.encode(
+                                "No se encontró un perfil docente para tu usuario.",
+                                StandardCharsets.UTF_8.toString()
+                            )
+                    );
+                    return null;
+                }
+
+                int teacherId = teacher.getInteger("usuario_id");
+
+                // Buscamos las materias asignadas vía Docente_Materia
+                List<Map> materiasRaw = Base.findAll(
+                    "SELECT m.codigo, m.nombre, m.anio_cursada " +
+                        "FROM Materia m " +
+                        "JOIN Docente_Materia dm ON m.codigo = dm.materia_id " +
+                        "WHERE dm.teacher_id = ? " +
+                        "ORDER BY m.anio_cursada ASC, m.nombre ASC",
+                    teacherId
                 );
-                int total = conteoRows.isEmpty() ? 0 : ((Number) conteoRows.get(0).get("total")).intValue();
-                anuncioMap.put("inscriptosCount", total);
+
+                model.put("materias", materiasRaw);
+                model.put("sinMaterias", materiasRaw.isEmpty());
+
+                return new ModelAndView(model, "docente_materias.mustache");
+            },
+            new MustacheTemplateEngine()
+        );
+
+        // GET /docente/materia/:materiaId — panel de acciones de una materia concreta
+        get(
+            "/docente/materia/:materiaId",
+            (req, res) -> {
+                String userRole = req.session().attribute("userRole");
+                if (userRole == null || !userRole.equals("DOCENTE")) {
+                    res.redirect(
+                        "/dashboard?error=" +
+                            URLEncoder.encode(
+                                "Acceso denegado.",
+                                StandardCharsets.UTF_8.toString()
+                            )
+                    );
+                    return null;
+                }
+
+                Integer userId = req.session().attribute("userId");
+                Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
+                if (teacher == null) {
+                    res.redirect("/dashboard");
+                    return null;
+                }
+
+                int teacherId = teacher.getInteger("usuario_id");
+                int materiaId;
+                try {
+                    materiaId = Integer.parseInt(req.params("materiaId"));
+                } catch (NumberFormatException e) {
+                    res.redirect(
+                        "/docente/materias?error=" +
+                            URLEncoder.encode(
+                                "Materia inválida.",
+                                StandardCharsets.UTF_8.toString()
+                            )
+                    );
+                    return null;
+                }
+
+                // Verificamos que la materia le pertenezca al docente
+                DocenteMateria asignacion = DocenteMateria.findFirst(
+                    "teacher_id = ? AND materia_id = ?",
+                    teacherId,
+                    materiaId
+                );
+                if (asignacion == null) {
+                    res.redirect(
+                        "/docente/materias?error=" +
+                            URLEncoder.encode(
+                                "No tenés acceso a esa materia.",
+                                StandardCharsets.UTF_8.toString()
+                            )
+                    );
+                    return null;
+                }
+
+                Materia materia = Materia.findFirst("codigo = ?", materiaId);
+                if (materia == null) {
+                    res.redirect("/docente/materias");
+                    return null;
+                }
+
+                // Periodo vigente de la materia
+                MateriaPeriodo periodo = MateriaPeriodo.findFirst(
+                    "materia_codigo = ?",
+                    materiaId
+                );
+                String periodoLabel = "";
+                if (periodo != null) {
+                    String raw = periodo.getString("tipo_cuatrimestre");
+                    if ("PRIMER_CUATRIMESTRE".equals(raw)) periodoLabel =
+                        "I Cuatrimestre";
+                    else if ("SEGUNDO_CUATRIMESTRE".equals(raw)) periodoLabel =
+                        "II Cuatrimestre";
+                    else if ("ANUAL".equals(raw)) periodoLabel = "Anual";
+                    else if ("VERANO".equals(raw)) periodoLabel = "Verano";
+                }
+
+                // Alumnos para el selector de notas (sólo inscriptos o regulares)
+                List<Map> inscriptosRows = Base.findAll(
+                    "SELECT u.id as usuario_id, u.nombre, u.apellido, s.legajo " +
+                        "FROM users u " +
+                        "JOIN student s ON u.id = s.usuario_id " +
+                        "JOIN Estado_Academico ea ON s.usuario_id = ea.usuario_id " +
+                        "WHERE ea.materia_codigo = ? AND ea.estado IN ('INSCRIPTO', 'REGULAR')",
+                    materiaId
+                );
+
+                List<Map<String, Object>> alumnosOptions = new ArrayList<>();
+                for (Map row : inscriptosRows) {
+                    String label =
+                        row.get("apellido") +
+                        ", " +
+                        row.get("nombre") +
+                        " — " +
+                        row.get("legajo");
+                    Map<String, Object> opt = new HashMap<>();
+                    opt.put("id", row.get("usuario_id"));
+                    opt.put("label", label);
+                    alumnosOptions.add(opt);
+                }
+
+                Map<String, Object> model = new HashMap<>();
+                model.put("codigoMateria", materiaId);
+                model.put("nombreMateria", materia.getString("nombre"));
+                model.put("anioMateria", materia.getInteger("anio_cursada"));
+                model.put("periodoMateria", periodoLabel);
+                model.put("alumnos", alumnosOptions);
+                model.put("hayAlumnos", !alumnosOptions.isEmpty());
+
+                List<Map<String, Object>> anuncios = new ArrayList<>();
+                if (periodo != null) {
+                    List<Map> anunciosDB = Base.findAll(
+                        "SELECT id, tipo, titulo, contenido, fecha_examen FROM Anuncio WHERE materia_periodo_id = ? ORDER BY fecha_creacion DESC",
+                        periodo.getId()
+                    );
+                    for (Map a : anunciosDB) {
+                        Map<String, Object> anuncioMap = new HashMap<>();
+                        anuncioMap.put("id", a.get("id"));
+                        anuncioMap.put("tipo", a.get("tipo"));
+                        anuncioMap.put("titulo", a.get("titulo"));
+                        anuncioMap.put("contenido", a.get("contenido"));
+                        anuncioMap.put("fechaExamen", a.get("fecha_examen"));
+                        anuncioMap.put(
+                            "esExamen",
+                            "EXAMEN".equals(a.get("tipo"))
+                        );
+                        if ("EXAMEN".equals(a.get("tipo"))) {
+                            List<Map> conteoRows = Base.findAll(
+                                "SELECT COUNT(*) AS total FROM Inscripcion_Parcial WHERE anuncio_id = ?",
+                                ((Number) a.get("id")).intValue()
+                            );
+                            int total = conteoRows.isEmpty()
+                                ? 0
+                                : (
+                                      (Number) conteoRows.get(0).get("total")
+                                  ).intValue();
+                            anuncioMap.put("inscriptosCount", total);
+                        }
+                        anuncios.add(anuncioMap);
+                    }
+                }
+                model.put("anuncios", anuncios);
+
+                // Anuncios del período con contador de inscriptos a parciales
+                List<Map<String, Object>> anunciosConConteo = new ArrayList<>();
+                if (periodo != null) {
+                    List<Map> anunciosDB = Base.findAll(
+                        "SELECT id, tipo, titulo, contenido, fecha_examen FROM Anuncio WHERE materia_periodo_id = ? ORDER BY fecha_creacion DESC",
+                        periodo.getId()
+                    );
+                    for (Map a : anunciosDB) {
+                        Map<String, Object> anuncioMap = new HashMap<>();
+                        anuncioMap.put("id", a.get("id"));
+                        anuncioMap.put("tipo", a.get("tipo"));
+                        anuncioMap.put("titulo", a.get("titulo"));
+                        anuncioMap.put("contenido", a.get("contenido"));
+                        anuncioMap.put("fechaExamen", a.get("fecha_examen"));
+                        anuncioMap.put(
+                            "esExamen",
+                            "EXAMEN".equals(a.get("tipo"))
+                        );
+                        if ("EXAMEN".equals(a.get("tipo"))) {
+                            List<Map> conteoRows = Base.findAll(
+                                "SELECT COUNT(*) AS total FROM Inscripcion_Parcial WHERE anuncio_id = ?",
+                                ((Number) a.get("id")).intValue()
+                            );
+                            int total = conteoRows.isEmpty()
+                                ? 0
+                                : (
+                                      (Number) conteoRows.get(0).get("total")
+                                  ).intValue();
+                            anuncioMap.put("inscriptosCount", total);
+                        }
+                        anunciosConConteo.add(anuncioMap);
+                    }
+                }
+                model.put("anuncios", anunciosConConteo);
+
+                String successMessage = req.queryParams("message");
+                String errorMessage = req.queryParams("error");
+                if (
+                    successMessage != null && !successMessage.isEmpty()
+                ) model.put("successMessage", successMessage);
+                if (errorMessage != null && !errorMessage.isEmpty()) model.put(
+                    "errorMessage",
+                    errorMessage
+                );
+
+                return new ModelAndView(
+                    model,
+                    "docente_panel_materia.mustache"
+                );
+            },
+            new MustacheTemplateEngine()
+        );
+
+        // POST /docente/materia/:materiaId/anuncio — persiste un anuncio
+        post("/docente/materia/:materiaId/anuncio", (req, res) -> {
+            String userRole = req.session().attribute("userRole");
+            if (userRole == null || !userRole.equals("DOCENTE")) {
+                res.redirect(
+                    "/dashboard?error=" +
+                        URLEncoder.encode(
+                            "Acceso denegado.",
+                            StandardCharsets.UTF_8.toString()
+                        )
+                );
+                return "";
             }
-            anunciosConConteo.add(anuncioMap);
-        }
-    }
-    model.put("anuncios", anunciosConConteo);
 
-    String successMessage = req.queryParams("message");
-    String errorMessage   = req.queryParams("error");
-    if (successMessage != null && !successMessage.isEmpty()) model.put("successMessage", successMessage);
-    if (errorMessage   != null && !errorMessage.isEmpty())   model.put("errorMessage",   errorMessage);
+            Integer userId = req.session().attribute("userId");
+            Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
+            int teacherId = teacher.getInteger("usuario_id");
+            int materiaId = Integer.parseInt(req.params("materiaId"));
 
-    return new ModelAndView(model, "docente_panel_materia.mustache");
-}, new MustacheTemplateEngine());
+            // Verificar pertenencia
+            if (
+                DocenteMateria.findFirst(
+                    "teacher_id = ? AND materia_id = ?",
+                    teacherId,
+                    materiaId
+                ) == null
+            ) {
+                res.redirect(
+                    "/docente/materias?error=" +
+                        URLEncoder.encode(
+                            "No tenés acceso a esa materia.",
+                            StandardCharsets.UTF_8.toString()
+                        )
+                );
+                return "";
+            }
 
+            // Obtener el MateriaPeriodo vigente
+            MateriaPeriodo mp = MateriaPeriodo.findFirst(
+                "materia_codigo = ?",
+                materiaId
+            );
+            if (mp == null) {
+                res.redirect(
+                    "/docente/materia/" +
+                        materiaId +
+                        "?error=" +
+                        URLEncoder.encode(
+                            "No existe un período activo para esta materia.",
+                            StandardCharsets.UTF_8.toString()
+                        )
+                );
+                return "";
+            }
 
-// POST /docente/materia/:materiaId/anuncio — persiste un anuncio
-post("/docente/materia/:materiaId/anuncio", (req, res) -> {
-    String userRole = req.session().attribute("userRole");
-    if (userRole == null || !userRole.equals("DOCENTE")) {
-        res.redirect("/dashboard?error=" + URLEncoder.encode(
-            "Acceso denegado.", StandardCharsets.UTF_8.toString()));
-        return "";
-    }
+            String tipo = req.queryParams("tipo");
+            String titulo = req.queryParams("titulo");
+            String contenido = req.queryParams("contenido");
+            String fechaExamen = req.queryParams("fecha_examen");
 
-    Integer userId  = req.session().attribute("userId");
-    Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
-    int teacherId   = teacher.getInteger("usuario_id");
-    int materiaId   = Integer.parseInt(req.params("materiaId"));
+            try {
+                Anuncio anuncio = new Anuncio();
+                anuncio.set("materia_periodo_id", mp.getId());
+                anuncio.set("teacher_id", teacherId);
+                anuncio.set("tipo", tipo);
+                anuncio.set("titulo", titulo);
+                anuncio.set("contenido", contenido);
+                if (
+                    "EXAMEN".equals(tipo) &&
+                    fechaExamen != null &&
+                    !fechaExamen.isBlank()
+                ) {
+                    anuncio.set(
+                        "fecha_examen",
+                        java.sql.Date.valueOf(fechaExamen)
+                    );
+                }
+                anuncio.saveIt();
 
-    // Verificar pertenencia
-    if (DocenteMateria.findFirst("teacher_id = ? AND materia_id = ?", teacherId, materiaId) == null) {
-        res.redirect("/docente/materias?error=" + URLEncoder.encode(
-            "No tenés acceso a esa materia.", StandardCharsets.UTF_8.toString()));
-        return "";
-    }
+                res.redirect(
+                    "/docente/materia/" +
+                        materiaId +
+                        "?message=" +
+                        URLEncoder.encode(
+                            "Anuncio publicado correctamente.",
+                            StandardCharsets.UTF_8.toString()
+                        )
+                );
+            } catch (Exception e) {
+                e.printStackTrace();
+                res.redirect(
+                    "/docente/materia/" +
+                        materiaId +
+                        "?error=" +
+                        URLEncoder.encode(
+                            "Error al publicar el anuncio: " + e.getMessage(),
+                            StandardCharsets.UTF_8.toString()
+                        )
+                );
+            }
+            return "";
+        });
 
-    // Obtener el MateriaPeriodo vigente
-    MateriaPeriodo mp = MateriaPeriodo.findFirst("materia_codigo = ?", materiaId);
-    if (mp == null) {
-        res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
-            "No existe un período activo para esta materia.", StandardCharsets.UTF_8.toString()));
-        return "";
-    }
+        // POST /docente/materia/:materiaId/nota — persiste una nota
+        post("/docente/materia/:materiaId/nota", (req, res) -> {
+            String userRole = req.session().attribute("userRole");
+            if (userRole == null || !userRole.equals("DOCENTE")) {
+                res.redirect(
+                    "/dashboard?error=" +
+                        URLEncoder.encode(
+                            "Acceso denegado.",
+                            StandardCharsets.UTF_8.toString()
+                        )
+                );
+                return "";
+            }
 
-    String tipo        = req.queryParams("tipo");
-    String titulo      = req.queryParams("titulo");
-    String contenido   = req.queryParams("contenido");
-    String fechaExamen = req.queryParams("fecha_examen");
+            Integer userId = req.session().attribute("userId");
+            Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
+            int teacherId = teacher.getInteger("usuario_id");
+            int materiaId = Integer.parseInt(req.params("materiaId"));
 
-    try {
-        Anuncio anuncio = new Anuncio();
-        anuncio.set("materia_periodo_id", mp.getId());
-        anuncio.set("teacher_id",         teacherId);
-        anuncio.set("tipo",               tipo);
-        anuncio.set("titulo",             titulo);
-        anuncio.set("contenido",          contenido);
-        if ("EXAMEN".equals(tipo) && fechaExamen != null && !fechaExamen.isBlank()) {
-            anuncio.set("fecha_examen", java.sql.Date.valueOf(fechaExamen));
-        }
-        anuncio.saveIt();
+            if (
+                DocenteMateria.findFirst(
+                    "teacher_id = ? AND materia_id = ?",
+                    teacherId,
+                    materiaId
+                ) == null
+            ) {
+                res.redirect(
+                    "/docente/materias?error=" +
+                        URLEncoder.encode(
+                            "No tenés acceso a esa materia.",
+                            StandardCharsets.UTF_8.toString()
+                        )
+                );
+                return "";
+            }
 
-        res.redirect("/docente/materia/" + materiaId + "?message=" + URLEncoder.encode(
-            "Anuncio publicado correctamente.", StandardCharsets.UTF_8.toString()));
-    } catch (Exception e) {
-        e.printStackTrace();
-        res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
-            "Error al publicar el anuncio: " + e.getMessage(), StandardCharsets.UTF_8.toString()));
-    }
-    return "";
-});
+            MateriaPeriodo mp = MateriaPeriodo.findFirst(
+                "materia_codigo = ?",
+                materiaId
+            );
+            if (mp == null) {
+                res.redirect(
+                    "/docente/materia/" +
+                        materiaId +
+                        "?error=" +
+                        URLEncoder.encode(
+                            "No existe un período activo para esta materia.",
+                            StandardCharsets.UTF_8.toString()
+                        )
+                );
+                return "";
+            }
 
+            String studentIdParam = req.queryParams("student_id");
+            String valorParam = req.queryParams("valor");
 
-// POST /docente/materia/:materiaId/nota — persiste una nota
-post("/docente/materia/:materiaId/nota", (req, res) -> {
-    String userRole = req.session().attribute("userRole");
-    if (userRole == null || !userRole.equals("DOCENTE")) {
-        res.redirect("/dashboard?error=" + URLEncoder.encode(
-            "Acceso denegado.", StandardCharsets.UTF_8.toString()));
-        return "";
-    }
+            if (
+                studentIdParam == null ||
+                studentIdParam.isEmpty() ||
+                valorParam == null ||
+                valorParam.isEmpty()
+            ) {
+                res.redirect(
+                    "/docente/materia/" +
+                        materiaId +
+                        "?error=" +
+                        URLEncoder.encode(
+                            "Debés seleccionar un alumno e ingresar una nota.",
+                            StandardCharsets.UTF_8.toString()
+                        )
+                );
+                return "";
+            }
 
-    Integer userId  = req.session().attribute("userId");
-    Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
-    int teacherId   = teacher.getInteger("usuario_id");
-    int materiaId   = Integer.parseInt(req.params("materiaId"));
+            String estadoCursada = req.queryParams("estado_cursada");
+            if (
+                estadoCursada == null || estadoCursada.isEmpty()
+            ) estadoCursada = "REGULAR";
 
-    if (DocenteMateria.findFirst("teacher_id = ? AND materia_id = ?", teacherId, materiaId) == null) {
-        res.redirect("/docente/materias?error=" + URLEncoder.encode(
-            "No tenés acceso a esa materia.", StandardCharsets.UTF_8.toString()));
-        return "";
-    }
+            try {
+                int studentId = Integer.parseInt(studentIdParam);
+                double valor = Double.parseDouble(valorParam);
 
-    MateriaPeriodo mp = MateriaPeriodo.findFirst("materia_codigo = ?", materiaId);
-    if (mp == null) {
-        res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
-            "No existe un período activo para esta materia.", StandardCharsets.UTF_8.toString()));
-        return "";
-    }
+                if (valor < 0 || valor > 10) throw new IllegalArgumentException(
+                    "La nota debe estar entre 0 y 10."
+                );
 
-    String studentIdParam = req.queryParams("student_id");
-    String valorParam     = req.queryParams("valor");
+                // Validar que el alumno esté inscripto o regular en la materia
+                List<Map> estadoRows = Base.findAll(
+                    "SELECT estado FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
+                    studentId,
+                    materiaId
+                );
+                Map estadoRow = estadoRows.isEmpty() ? null : estadoRows.get(0);
+                if (
+                    estadoRow == null ||
+                    (!"INSCRIPTO".equals(estadoRow.get("estado")) &&
+                        !"REGULAR".equals(estadoRow.get("estado")))
+                ) {
+                    throw new SecurityException(
+                        "El alumno no está inscripto o no es válido para recibir nota en esta materia."
+                    );
+                }
 
-    if (studentIdParam == null || studentIdParam.isEmpty() || valorParam == null || valorParam.isEmpty()) {
-        res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
-            "Debés seleccionar un alumno e ingresar una nota.", StandardCharsets.UTF_8.toString()));
-        return "";
-    }
+                // Guardar la nota con instancia CURSADA
+                Nota nota = new Nota();
+                nota.set("materia_periodo_id", mp.getId());
+                nota.set("student_id", studentId);
+                nota.set("teacher_id", teacherId);
+                nota.set("valor", valor);
+                nota.set("instancia", "CURSADA");
+                nota.saveIt();
 
+                // Actualizar Estado_Academico: si PROMOCION, guardar como APROBADO en el motor de correlatividades
+                String estadoFinal = "PROMOCION".equals(estadoCursada)
+                    ? "PROMOCION"
+                    : estadoCursada;
+                Base.exec(
+                    "INSERT INTO Estado_Academico (usuario_id, materia_codigo, estado) VALUES (?, ?, ?) " +
+                        "ON DUPLICATE KEY UPDATE estado = VALUES(estado)",
+                    studentId,
+                    materiaId,
+                    estadoFinal
+                );
 
-    String estadoCursada = req.queryParams("estado_cursada");
-    if (estadoCursada == null || estadoCursada.isEmpty()) estadoCursada = "REGULAR";
+                res.redirect(
+                    "/docente/materia/" +
+                        materiaId +
+                        "?message=" +
+                        URLEncoder.encode(
+                            "Nota y estado de cursada registrados correctamente.",
+                            StandardCharsets.UTF_8.toString()
+                        )
+                );
+            } catch (Exception e) {
+                e.printStackTrace();
+                res.redirect(
+                    "/docente/materia/" +
+                        materiaId +
+                        "?error=" +
+                        URLEncoder.encode(
+                            "Error al registrar la nota: " + e.getMessage(),
+                            StandardCharsets.UTF_8.toString()
+                        )
+                );
+            }
+            return "";
+        });
 
-    try {
-        int    studentId = Integer.parseInt(studentIdParam);
-        double valor     = Double.parseDouble(valorParam);
+        // POST /docente/materia/:materiaId/aula — persiste asignación de aula
+        post("/docente/materia/:materiaId/aula", (req, res) -> {
+            String userRole = req.session().attribute("userRole");
+            if (userRole == null || !userRole.equals("DOCENTE")) {
+                res.redirect(
+                    "/dashboard?error=" +
+                        URLEncoder.encode(
+                            "Acceso denegado.",
+                            StandardCharsets.UTF_8.toString()
+                        )
+                );
+                return "";
+            }
 
-        if (valor < 0 || valor > 10) throw new IllegalArgumentException("La nota debe estar entre 0 y 10.");
+            Integer userId = req.session().attribute("userId");
+            Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
+            int teacherId = teacher.getInteger("usuario_id");
+            int materiaId = Integer.parseInt(req.params("materiaId"));
 
-        // Validar que el alumno esté inscripto o regular en la materia
-        List<Map> estadoRows = Base.findAll(
-            "SELECT estado FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
-            studentId, materiaId
+            if (
+                DocenteMateria.findFirst(
+                    "teacher_id = ? AND materia_id = ?",
+                    teacherId,
+                    materiaId
+                ) == null
+            ) {
+                res.redirect(
+                    "/docente/materias?error=" +
+                        URLEncoder.encode(
+                            "No tenés acceso a esa materia.",
+                            StandardCharsets.UTF_8.toString()
+                        )
+                );
+                return "";
+            }
+
+            MateriaPeriodo mp = MateriaPeriodo.findFirst(
+                "materia_codigo = ?",
+                materiaId
+            );
+            if (mp == null) {
+                res.redirect(
+                    "/docente/materia/" +
+                        materiaId +
+                        "?error=" +
+                        URLEncoder.encode(
+                            "No existe un período activo para esta materia.",
+                            StandardCharsets.UTF_8.toString()
+                        )
+                );
+                return "";
+            }
+
+            String aula = req.queryParams("aula");
+            if (aula == null || aula.isBlank()) {
+                res.redirect(
+                    "/docente/materia/" +
+                        materiaId +
+                        "?error=" +
+                        URLEncoder.encode(
+                            "Debés ingresar el nombre o número del aula.",
+                            StandardCharsets.UTF_8.toString()
+                        )
+                );
+                return "";
+            }
+
+            try {
+                AulaAsignacion asig = new AulaAsignacion();
+                asig.set("materia_periodo_id", mp.getId());
+                asig.set("teacher_id", teacherId);
+                asig.set("aula", aula);
+                asig.saveIt();
+
+                res.redirect(
+                    "/docente/materia/" +
+                        materiaId +
+                        "?message=" +
+                        URLEncoder.encode(
+                            "Aula asignada correctamente.",
+                            StandardCharsets.UTF_8.toString()
+                        )
+                );
+            } catch (Exception e) {
+                e.printStackTrace();
+                res.redirect(
+                    "/docente/materia/" +
+                        materiaId +
+                        "?error=" +
+                        URLEncoder.encode(
+                            "Error al asignar el aula: " + e.getMessage(),
+                            StandardCharsets.UTF_8.toString()
+                        )
+                );
+            }
+            return "";
+        });
+
+        // GET /docente/materia/:materiaId/contenido — stub "Próximamente"
+        get(
+            "/docente/materia/:materiaId/contenido",
+            (req, res) -> {
+                String userRole = req.session().attribute("userRole");
+                if (userRole == null || !userRole.equals("DOCENTE")) {
+                    res.redirect(
+                        "/dashboard?error=" +
+                            URLEncoder.encode(
+                                "Acceso denegado.",
+                                StandardCharsets.UTF_8.toString()
+                            )
+                    );
+                    return null;
+                }
+                return new ModelAndView(
+                    new HashMap<>(),
+                    "contenido_proximamente.mustache"
+                );
+            },
+            new MustacheTemplateEngine()
         );
-        Map estadoRow = estadoRows.isEmpty() ? null : estadoRows.get(0);
-        if (estadoRow == null || (!"INSCRIPTO".equals(estadoRow.get("estado")) && !"REGULAR".equals(estadoRow.get("estado")))) {
-            throw new SecurityException("El alumno no está inscripto o no es válido para recibir nota en esta materia.");
-        }
-
-        // Guardar la nota con instancia CURSADA
-        Nota nota = new Nota();
-        nota.set("materia_periodo_id", mp.getId());
-        nota.set("student_id",         studentId);
-        nota.set("teacher_id",         teacherId);
-        nota.set("valor",              valor);
-        nota.set("instancia",          "CURSADA");
-        nota.saveIt();
-
-        // Actualizar Estado_Academico: si PROMOCION, guardar como APROBADO en el motor de correlatividades
-        String estadoFinal = "PROMOCION".equals(estadoCursada) ? "PROMOCION" : estadoCursada;
-        Base.exec(
-            "INSERT INTO Estado_Academico (usuario_id, materia_codigo, estado) VALUES (?, ?, ?) " +
-            "ON DUPLICATE KEY UPDATE estado = VALUES(estado)",
-            studentId, materiaId, estadoFinal
-        );
-
-        res.redirect("/docente/materia/" + materiaId + "?message=" + URLEncoder.encode(
-            "Nota y estado de cursada registrados correctamente.", StandardCharsets.UTF_8.toString()));
-    } catch (Exception e) {
-        e.printStackTrace();
-        res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
-            "Error al registrar la nota: " + e.getMessage(), StandardCharsets.UTF_8.toString()));
-    }
-    return "";
-});
-
-
-// POST /docente/materia/:materiaId/aula — persiste asignación de aula
-post("/docente/materia/:materiaId/aula", (req, res) -> {
-    String userRole = req.session().attribute("userRole");
-    if (userRole == null || !userRole.equals("DOCENTE")) {
-        res.redirect("/dashboard?error=" + URLEncoder.encode(
-            "Acceso denegado.", StandardCharsets.UTF_8.toString()));
-        return "";
-    }
-
-    Integer userId  = req.session().attribute("userId");
-    Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
-    int teacherId   = teacher.getInteger("usuario_id");
-    int materiaId   = Integer.parseInt(req.params("materiaId"));
-
-    if (DocenteMateria.findFirst("teacher_id = ? AND materia_id = ?", teacherId, materiaId) == null) {
-        res.redirect("/docente/materias?error=" + URLEncoder.encode(
-            "No tenés acceso a esa materia.", StandardCharsets.UTF_8.toString()));
-        return "";
-    }
-
-    MateriaPeriodo mp = MateriaPeriodo.findFirst("materia_codigo = ?", materiaId);
-    if (mp == null) {
-        res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
-            "No existe un período activo para esta materia.", StandardCharsets.UTF_8.toString()));
-        return "";
-    }
-
-    String aula = req.queryParams("aula");
-    if (aula == null || aula.isBlank()) {
-        res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
-            "Debés ingresar el nombre o número del aula.", StandardCharsets.UTF_8.toString()));
-        return "";
-    }
-
-    try {
-        AulaAsignacion asig = new AulaAsignacion();
-        asig.set("materia_periodo_id", mp.getId());
-        asig.set("teacher_id",         teacherId);
-        asig.set("aula",               aula);
-        asig.saveIt();
-
-        res.redirect("/docente/materia/" + materiaId + "?message=" + URLEncoder.encode(
-            "Aula asignada correctamente.", StandardCharsets.UTF_8.toString()));
-    } catch (Exception e) {
-        e.printStackTrace();
-        res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
-            "Error al asignar el aula: " + e.getMessage(), StandardCharsets.UTF_8.toString()));
-    }
-    return "";
-});
-
-
-// GET /docente/materia/:materiaId/contenido — stub "Próximamente"
-get("/docente/materia/:materiaId/contenido", (req, res) -> {
-    String userRole = req.session().attribute("userRole");
-    if (userRole == null || !userRole.equals("DOCENTE")) {
-        res.redirect("/dashboard?error=" + URLEncoder.encode(
-            "Acceso denegado.", StandardCharsets.UTF_8.toString()));
-        return null;
-    }
-    return new ModelAndView(new HashMap<>(), "contenido_proximamente.mustache");
-}, new MustacheTemplateEngine());
-
-
 
         // POST: Maneja el envío del formulario de inicio de sesión.
         post(
@@ -2030,7 +2479,9 @@ get("/docente/materia/:materiaId/contenido", (req, res) -> {
         // INSCRIPCION A CURSADA
         // ======================================
         get("/estudiante/inscripcion/cursada", (req, res) -> {
-            String currentUsername = req.session().attribute("currentUserUsername");
+            String currentUsername = req
+                .session()
+                .attribute("currentUserUsername");
             String userRole = req.session().attribute("userRole");
             if (currentUsername == null || !"ESTUDIANTE".equals(userRole)) {
                 res.redirect("/");
@@ -2039,21 +2490,26 @@ get("/docente/materia/:materiaId/contenido", (req, res) -> {
 
             List<Map> studentRows = Base.findAll(
                 "SELECT s.usuario_id, s.plan_estudio_id FROM student s " +
-                "JOIN users u ON u.id = s.usuario_id WHERE u.nombre_usuario = ?",
+                    "JOIN users u ON u.id = s.usuario_id WHERE u.nombre_usuario = ?",
                 currentUsername
             );
             if (studentRows.isEmpty()) {
                 res.redirect("/dashboard?error=No+se+encontro+el+estudiante");
                 return null;
             }
-            int alumnoId = ((Number) studentRows.get(0).get("usuario_id")).intValue();
-            int planId   = ((Number) studentRows.get(0).get("plan_estudio_id")).intValue();
+            int alumnoId = (
+                (Number) studentRows.get(0).get("usuario_id")
+            ).intValue();
+            int planId = (
+                (Number) studentRows.get(0).get("plan_estudio_id")
+            ).intValue();
 
             List<Map<String, Object>> materiasDisponibles = new ArrayList<>();
 
             // 1. Obtener todas las materias del plan de estudios via SQL directo
             List<Map> materiasPlan = Base.findAll(
-                "SELECT codigo, nombre, anio_cursada FROM Materia WHERE plan_estudio_id = ?", planId
+                "SELECT codigo, nombre, anio_cursada FROM Materia WHERE plan_estudio_id = ?",
+                planId
             );
 
             for (Map m : materiasPlan) {
@@ -2062,43 +2518,58 @@ get("/docente/materia/:materiaId/contenido", (req, res) -> {
 
                 // 2. Excluir las que ya están en Estado_Academico
                 List<Map> estadoRows = Base.findAll(
-                        "SELECT id FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
-                        alumnoId, materiaCodigo
+                    "SELECT id FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
+                    alumnoId,
+                    materiaCodigo
                 );
-                
+
                 if (!estadoRows.isEmpty()) {
                     continue; // Ya tiene registro, la salteamos
                 }
 
                 // 3. Validar correlatividades tipo 'CURSAR'
                 List<Map> requisitos = Base.findAll(
-                        "SELECT materia_correlativa_codigo, condicion FROM Correlatividad WHERE materia_codigo = ? AND tipo_requisito = 'CURSAR'",
-                        materiaCodigo
+                    "SELECT materia_correlativa_codigo, condicion FROM Correlatividad WHERE materia_codigo = ? AND tipo_requisito = 'CURSAR'",
+                    materiaCodigo
                 );
 
                 boolean cumpleCorrelatividades = true;
                 for (Map reqItem : requisitos) {
-                    int reqCodigo = ((Number) reqItem.get("materia_correlativa_codigo")).intValue();
-                    String condicionRequerida = (String) reqItem.get("condicion");
+                    int reqCodigo = (
+                        (Number) reqItem.get("materia_correlativa_codigo")
+                    ).intValue();
+                    String condicionRequerida = (String) reqItem.get(
+                        "condicion"
+                    );
 
                     List<Map> estadoReqRows = Base.findAll(
-                            "SELECT estado FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
-                            alumnoId, reqCodigo
+                        "SELECT estado FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
+                        alumnoId,
+                        reqCodigo
                     );
 
                     if (estadoReqRows.isEmpty()) {
                         cumpleCorrelatividades = false;
                         break;
                     }
-                    
-                    String estadoActual = (String) estadoReqRows.get(0).get("estado");
-                    
-                    if ("APROBADA".equals(condicionRequerida) && !"APROBADO".equals(estadoActual)) {
+
+                    String estadoActual = (String) estadoReqRows
+                        .get(0)
+                        .get("estado");
+
+                    if (
+                        "APROBADA".equals(condicionRequerida) &&
+                        !"APROBADO".equals(estadoActual)
+                    ) {
                         cumpleCorrelatividades = false;
                         break;
                     }
-                    
-                    if ("REGULAR".equals(condicionRequerida) && (!"REGULAR".equals(estadoActual) && !"APROBADO".equals(estadoActual))) {
+
+                    if (
+                        "REGULAR".equals(condicionRequerida) &&
+                        (!"REGULAR".equals(estadoActual) &&
+                            !"APROBADO".equals(estadoActual))
+                    ) {
                         cumpleCorrelatividades = false;
                         break;
                     }
@@ -2115,19 +2586,30 @@ get("/docente/materia/:materiaId/contenido", (req, res) -> {
 
             Map<String, Object> viewData = new HashMap<>();
             viewData.put("materias", materiasDisponibles);
-            
+
             String successMessage = req.queryParams("message");
             String errorMessage = req.queryParams("error");
-            if (successMessage != null) viewData.put("successMessage", successMessage);
-            if (errorMessage != null) viewData.put("errorMessage", errorMessage);
+            if (successMessage != null) viewData.put(
+                "successMessage",
+                successMessage
+            );
+            if (errorMessage != null) viewData.put(
+                "errorMessage",
+                errorMessage
+            );
 
             return new spark.template.mustache.MustacheTemplateEngine().render(
-                    new spark.ModelAndView(viewData, "inscripcion_materias.mustache")
+                new spark.ModelAndView(
+                    viewData,
+                    "inscripcion_materias.mustache"
+                )
             );
         });
 
         post("/estudiante/inscripcion/cursada", (req, res) -> {
-            String currentUsername = req.session().attribute("currentUserUsername");
+            String currentUsername = req
+                .session()
+                .attribute("currentUserUsername");
             String userRole = req.session().attribute("userRole");
             if (currentUsername == null || !"ESTUDIANTE".equals(userRole)) {
                 res.status(403);
@@ -2137,58 +2619,87 @@ get("/docente/materia/:materiaId/contenido", (req, res) -> {
             User u = User.findFirst("nombre_usuario = ?", currentUsername);
             Student s = Student.findById(u.getId());
             int alumnoId = s.getInteger("usuario_id");
-            
+
             String materiaCodigoStr = req.queryParams("materia_codigo");
             if (materiaCodigoStr == null || materiaCodigoStr.isEmpty()) {
-                res.redirect("/estudiante/inscripcion/cursada?error=Materia+no+especificada");
+                res.redirect(
+                    "/estudiante/inscripcion/cursada?error=Materia+no+especificada"
+                );
                 return null;
             }
             int materiaCodigo = Integer.parseInt(materiaCodigoStr);
             Materia materiaObj = Materia.findById(materiaCodigo);
 
-            if (materiaObj == null || materiaObj.getInteger("plan_estudio_id") != s.getInteger("plan_estudio_id")) {
-                res.redirect("/estudiante/inscripcion/cursada?error=Materia+no+valida");
+            if (
+                materiaObj == null ||
+                materiaObj.getInteger("plan_estudio_id") !=
+                    s.getInteger("plan_estudio_id")
+            ) {
+                res.redirect(
+                    "/estudiante/inscripcion/cursada?error=Materia+no+valida"
+                );
                 return null;
             }
 
             // 1. Validar que no exista en Estado_Academico
             List<Map> estadoRows = org.javalite.activejdbc.Base.findAll(
-                    "SELECT id FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
-                    alumnoId, materiaCodigo
+                "SELECT id FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
+                alumnoId,
+                materiaCodigo
             );
             if (!estadoRows.isEmpty()) {
-                res.redirect("/estudiante/inscripcion/cursada?error=Ya+te+encuentras+inscripto+en+esta+materia");
+                res.redirect(
+                    "/estudiante/inscripcion/cursada?error=Ya+te+encuentras+inscripto+en+esta+materia"
+                );
                 return null;
             }
 
             // 2. Re-validar Correlatividades tipo 'CURSAR'
             List<Map> requisitos = org.javalite.activejdbc.Base.findAll(
-                    "SELECT materia_correlativa_codigo, condicion FROM Correlatividad WHERE materia_codigo = ? AND tipo_requisito = 'CURSAR'",
-                    materiaCodigo
+                "SELECT materia_correlativa_codigo, condicion FROM Correlatividad WHERE materia_codigo = ? AND tipo_requisito = 'CURSAR'",
+                materiaCodigo
             );
 
             for (Map reqItem : requisitos) {
-                int reqCodigo = ((Number) reqItem.get("materia_correlativa_codigo")).intValue();
+                int reqCodigo = (
+                    (Number) reqItem.get("materia_correlativa_codigo")
+                ).intValue();
                 String condicionRequerida = (String) reqItem.get("condicion");
 
                 List<Map> estadoReqRows = org.javalite.activejdbc.Base.findAll(
-                        "SELECT estado FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
-                        alumnoId, reqCodigo
+                    "SELECT estado FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
+                    alumnoId,
+                    reqCodigo
                 );
 
                 if (estadoReqRows.isEmpty()) {
-                    res.redirect("/estudiante/inscripcion/cursada?error=No+cumples+las+correlatividades");
+                    res.redirect(
+                        "/estudiante/inscripcion/cursada?error=No+cumples+las+correlatividades"
+                    );
                     return null;
                 }
-                
-                String estadoActual = (String) estadoReqRows.get(0).get("estado");
-                
-                if ("APROBADA".equals(condicionRequerida) && !"APROBADO".equals(estadoActual)) {
-                    res.redirect("/estudiante/inscripcion/cursada?error=No+cumples+las+correlatividades");
+
+                String estadoActual = (String) estadoReqRows
+                    .get(0)
+                    .get("estado");
+
+                if (
+                    "APROBADA".equals(condicionRequerida) &&
+                    !"APROBADO".equals(estadoActual)
+                ) {
+                    res.redirect(
+                        "/estudiante/inscripcion/cursada?error=No+cumples+las+correlatividades"
+                    );
                     return null;
                 }
-                if ("REGULAR".equals(condicionRequerida) && (!"REGULAR".equals(estadoActual) && !"APROBADO".equals(estadoActual))) {
-                    res.redirect("/estudiante/inscripcion/cursada?error=No+cumples+las+correlatividades");
+                if (
+                    "REGULAR".equals(condicionRequerida) &&
+                    (!"REGULAR".equals(estadoActual) &&
+                        !"APROBADO".equals(estadoActual))
+                ) {
+                    res.redirect(
+                        "/estudiante/inscripcion/cursada?error=No+cumples+las+correlatividades"
+                    );
                     return null;
                 }
             }
@@ -2197,64 +2708,71 @@ get("/docente/materia/:materiaId/contenido", (req, res) -> {
             try {
                 org.javalite.activejdbc.Base.exec(
                     "INSERT INTO Estado_Academico (usuario_id, materia_codigo, estado) VALUES (?, ?, ?)",
-                    alumnoId, materiaCodigo, "INSCRIPTO"
+                    alumnoId,
+                    materiaCodigo,
+                    "INSCRIPTO"
                 );
-                res.redirect("/estudiante/inscripcion/cursada?message=Inscripcion+exitosa");
+                res.redirect(
+                    "/estudiante/inscripcion/cursada?message=Inscripcion+exitosa"
+                );
                 return null;
             } catch (Exception e) {
                 e.printStackTrace();
-                res.redirect("/estudiante/inscripcion/cursada?error=Ocurrio+un+error+al+inscribirse");
+                res.redirect(
+                    "/estudiante/inscripcion/cursada?error=Ocurrio+un+error+al+inscribirse"
+                );
                 return null;
             }
         });
 
-        // ======================================
-        // INSCRIPCION A MESA DE EXAMEN
-        //=======================================
-        // ISSUE: Listar mesas de examen disponibles para el estudiante
+        // =====================================================================================
+        // INSCRIPCION A MESA DE EXAMEN - LISTAR MESAS DISPONIBLES (VERSION DEFINITIVA)
+        // =====================================================================================
         get("/estudiante/inscripcion/examen", (req, res) -> {
             String currentUsernameEx = req.session().attribute("currentUserUsername");
             String userRoleEx = req.session().attribute("userRole");
+            
             if (currentUsernameEx == null || !"ESTUDIANTE".equals(userRoleEx)) {
                 res.redirect("/login");
                 return null;
             }
+            
             List<Map> studentRowsEx = Base.findAll(
                 "SELECT s.usuario_id FROM student s " +
                 "JOIN users u ON u.id = s.usuario_id WHERE u.nombre_usuario = ?",
                 currentUsernameEx
             );
+            
             if (studentRowsEx.isEmpty()) {
                 res.redirect("/dashboard?error=No+se+encontro+el+estudiante");
                 return null;
             }
+            
             int alumnoId = ((Number) studentRowsEx.get(0).get("usuario_id")).intValue();
             List<Map<String, Object>> mesasHabilitadas = new ArrayList<>();
 
             // 1. Obtener todas las mesas de examen via SQL directo
-            List<Map> todasLasMesas = Base.findAll(
-                "SELECT id, materia_codigo, fecha FROM Mesa_Examen"
-            );
+            List<Map> todasLasMesas = Base.findAll("SELECT id, materia_codigo, fecha FROM mesas_examen");
 
             for (Map mesa : todasLasMesas) {
                 int materiaCodigo = ((Number) mesa.get("materia_codigo")).intValue();
 
                 // 2. Consultar el Estado Académico del alumno para esta materia
                 List<Map> estadoRows = Base.findAll(
-                        "SELECT estado FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
-                        alumnoId, materiaCodigo
+                    "SELECT estado FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
+                    alumnoId, materiaCodigo
                 );
 
                 if (!estadoRows.isEmpty()) {
                     String estado = (String) estadoRows.get(0).get("estado");
 
-                    // Condición de Negocio: Solo REGULAR o LIBRE
+                    // REGLA DE NEGOCIO PRINCIPAL: Solo rinden quienes estén REGULAR o LIBRE
                     if ("REGULAR".equals(estado) || "LIBRE".equals(estado)) {
-
+                        
                         // 3. Validar correlatividades de tipo 'RENDIR'
                         List<Map> requisitos = Base.findAll(
-                                "SELECT materia_correlativa_codigo FROM Correlatividad WHERE materia_codigo = ? AND tipo_requisito = 'RENDIR'",
-                                materiaCodigo
+                            "SELECT materia_correlativa_codigo FROM Correlatividad WHERE materia_codigo = ? AND tipo_requisito = 'RENDIR'",
+                            materiaCodigo
                         );
 
                         boolean cumpleCorrelatividades = true;
@@ -2262,10 +2780,11 @@ get("/docente/materia/:materiaId/contenido", (req, res) -> {
                             int reqCodigo = ((Number) reqItem.get("materia_correlativa_codigo")).intValue();
 
                             List<Map> estadoReqRows = Base.findAll(
-                                    "SELECT estado FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
-                                    alumnoId, reqCodigo
+                                "SELECT estado FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
+                                alumnoId, reqCodigo
                             );
 
+                            // Si le falta la correlativa o no la tiene APROBADA, no puede rendir la mesa
                             if (estadoReqRows.isEmpty() || !"APROBADO".equals(estadoReqRows.get(0).get("estado"))) {
                                 cumpleCorrelatividades = false;
                                 break;
@@ -2277,6 +2796,22 @@ get("/docente/materia/:materiaId/contenido", (req, res) -> {
                             mesaData.put("id", ((Number) mesa.get("id")).intValue());
                             mesaData.put("materia_codigo", materiaCodigo);
                             mesaData.put("fecha", mesa.get("fecha"));
+                            
+                            // Agregamos el nombre de la materia para que no salga solo el código en la vista
+                            List<Map> matNombreRow = Base.findAll("SELECT nombre FROM Materia WHERE codigo = ?", materiaCodigo);
+                            if (!matNombreRow.isEmpty()) {
+                                mesaData.put("materia_nombre", matNombreRow.get(0).get("nombre"));
+                            } else {
+                                mesaData.put("materia_nombre", "Materia " + materiaCodigo);
+                            }
+
+                            // Comprobamos si ya está inscripto en esta mesa específica
+                            List<Map> yaInscriptoRow = Base.findAll(
+                                "SELECT 1 FROM inscripciones_examen WHERE usuario_id = ? AND mesa_id = ?",
+                                alumnoId, ((Number) mesa.get("id")).intValue()
+                            );
+                            mesaData.put("yaInscripto", !yaInscriptoRow.isEmpty());
+
                             mesasHabilitadas.add(mesaData);
                         }
                     }
@@ -2285,103 +2820,131 @@ get("/docente/materia/:materiaId/contenido", (req, res) -> {
 
             Map<String, Object> viewData = new HashMap<>();
             viewData.put("mesas", mesasHabilitadas);
-            String successMsgEx = req.queryParams("success");
-            String errorMsgEx   = req.queryParams("error");
-            if (successMsgEx != null) viewData.put("successMessage", successMsgEx);
-            if (errorMsgEx   != null) viewData.put("errorMessage",   errorMsgEx);
+            viewData.put("username", currentUsernameEx);
 
-            return new spark.template.mustache.MustacheTemplateEngine().render(
-                    new spark.ModelAndView(viewData, "inscripcion_examenes.mustache")
-            );
-        });
+            String successMsgEx = req.queryParams("success");
+            String errorMsgEx = req.queryParams("error");
+            if (successMsgEx != null) viewData.put("successMessage", URLDecoder.decode(successMsgEx, StandardCharsets.UTF_8));
+            if (errorMsgEx != null) viewData.put("errorMessage", URLDecoder.decode(errorMsgEx, StandardCharsets.UTF_8));
+
+            return new ModelAndView(viewData, "inscripcion_examenes.mustache");
+        }, new MustacheTemplateEngine());
 
         // ISSUE: Procesar la inscripción del estudiante a la mesa de examen seleccionada
         post("/estudiante/inscripcion/examen", (req, res) -> {
-            String currentUsernamePost = req.session().attribute("currentUserUsername");
+            String currentUsernamePost = req
+                .session()
+                .attribute("currentUserUsername");
             String userRolePost = req.session().attribute("userRole");
-            if (currentUsernamePost == null || !"ESTUDIANTE".equals(userRolePost)) {
+            if (
+                currentUsernamePost == null ||
+                !"ESTUDIANTE".equals(userRolePost)
+            ) {
                 res.status(403);
                 return "No autorizado";
             }
             List<Map> studentRowsPost = Base.findAll(
                 "SELECT s.usuario_id FROM student s " +
-                "JOIN users u ON u.id = s.usuario_id WHERE u.nombre_usuario = ?",
+                    "JOIN users u ON u.id = s.usuario_id WHERE u.nombre_usuario = ?",
                 currentUsernamePost
             );
             if (studentRowsPost.isEmpty()) {
                 res.redirect("/dashboard?error=No+se+encontro+el+estudiante");
                 return null;
             }
-            int alumnoId = ((Number) studentRowsPost.get(0).get("usuario_id")).intValue();
+            int alumnoId = (
+                (Number) studentRowsPost.get(0).get("usuario_id")
+            ).intValue();
             String mesaIdStr = req.queryParams("mesa_id");
 
             if (mesaIdStr == null || mesaIdStr.isEmpty()) {
-                res.redirect("/estudiante/inscripcion/examen?error=Mesa no especificada");
+                res.redirect(
+                    "/estudiante/inscripcion/examen?error=Mesa no especificada"
+                );
                 return null;
             }
 
             int mesaId = Integer.parseInt(mesaIdStr);
             List<Map> mesaRows = Base.findAll(
-                "SELECT id, materia_codigo FROM Mesa_Examen WHERE id = ?", mesaId
+                "SELECT id, materia_codigo FROM Mesa_Examen WHERE id = ?",
+                mesaId
             );
 
             // VALIDACIONES DE SEGURIDAD
             if (mesaRows.isEmpty()) {
-                res.redirect("/estudiante/inscripcion/examen?error=La+mesa+seleccionada+no+existe");
+                res.redirect(
+                    "/estudiante/inscripcion/examen?error=La+mesa+seleccionada+no+existe"
+                );
                 return null;
             }
 
-            int materiaCodigo2 = ((Number) mesaRows.get(0).get("materia_codigo")).intValue();
+            int materiaCodigo2 = (
+                (Number) mesaRows.get(0).get("materia_codigo")
+            ).intValue();
 
             // 1. Re-verificar Estado Académico
             List<Map> estadoRows = Base.findAll(
-                    "SELECT estado FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
-                    alumnoId, materiaCodigo2
+                "SELECT estado FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
+                alumnoId,
+                materiaCodigo2
             );
 
             if (estadoRows.isEmpty()) {
-                res.redirect("/estudiante/inscripcion/examen?error=No+posees+estado+academico+en+esta+materia");
+                res.redirect(
+                    "/estudiante/inscripcion/examen?error=No+posees+estado+academico+en+esta+materia"
+                );
                 return null;
             }
 
             String estado = (String) estadoRows.get(0).get("estado");
             if (!"REGULAR".equals(estado) && !"LIBRE".equals(estado)) {
-                res.redirect("/estudiante/inscripcion/examen?error=Tu+condicion+academica+no+te+permite+rendir+esta+materia");
+                res.redirect(
+                    "/estudiante/inscripcion/examen?error=Tu+condicion+academica+no+te+permite+rendir+esta+materia"
+                );
                 return null;
             }
 
             // 2. Re-verificar Correlatividades de tipo 'RENDIR'
             List<Map> requisitosPost = Base.findAll(
-                    "SELECT materia_correlativa_codigo FROM Correlatividad WHERE materia_codigo = ? AND tipo_requisito = 'RENDIR'",
-                    materiaCodigo2
+                "SELECT materia_correlativa_codigo FROM Correlatividad WHERE materia_codigo = ? AND tipo_requisito = 'RENDIR'",
+                materiaCodigo2
             );
 
             for (Map reqItem : requisitosPost) {
-                int reqCodigo = ((Number) reqItem.get("materia_correlativa_codigo")).intValue();
+                int reqCodigo = (
+                    (Number) reqItem.get("materia_correlativa_codigo")
+                ).intValue();
 
                 List<Map> estadoReqRows = Base.findAll(
-                        "SELECT estado FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
-                        alumnoId, reqCodigo
+                    "SELECT estado FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
+                    alumnoId,
+                    reqCodigo
                 );
 
-                if (estadoReqRows.isEmpty() || !"APROBADO".equals(estadoReqRows.get(0).get("estado"))) {
-                    res.redirect("/estudiante/inscripcion/examen?error=No+cumples+con+las+correlatividades+requeridas+para+rendir");
+                if (
+                    estadoReqRows.isEmpty() ||
+                    !"APROBADO".equals(estadoReqRows.get(0).get("estado"))
+                ) {
+                    res.redirect(
+                        "/estudiante/inscripcion/examen?error=No+cumples+con+las+correlatividades+requeridas+para+rendir"
+                    );
                     return null;
                 }
             }
 
-                    // 3. Persistir la inscripción en la base de datos
-        try {
-            Base.exec(
-                "INSERT INTO Inscripcion_Examen (usuario_id, mesa_id) VALUES (?, ?)",
-                alumnoId, mesaId
-            );
-            res.redirect("/estudiante/inscripcion/examen?success=Te+has+inscripto+a+la+mesa+con+exito");
-        } catch (Exception e) {
-            res.redirect("/estudiante/inscripcion/examen?error=Ya+te+encuentras+inscripto+en+esta+mesa+de+examen");
-        }
+            // 3. Persistir la inscripción en la base de datos
+            try {
+                Base.exec("INSERT INTO inscripciones_examen (usuario_id, mesa_id) VALUES (?, ?)", alumnoId, mesaId);
+                res.redirect(
+                    "/estudiante/inscripcion/examen?success=Te+has+inscripto+a+la+mesa+con+exito"
+                );
+            } catch (Exception e) {
+                res.redirect(
+                    "/estudiante/inscripcion/examen?error=Ya+te+encuentras+inscripto+en+esta+mesa+de+examen"
+                );
+            }
 
-        return null;
+            return null;
         });
 
         // ==========================================
@@ -2389,90 +2952,114 @@ get("/docente/materia/:materiaId/contenido", (req, res) -> {
         // ==========================================
 
         // GET /estudiante/aula-virtual — muestra materias cursando y sus anuncios
-        get("/estudiante/aula-virtual", (req, res) -> {
-            String username = req.session().attribute("currentUserUsername");
-            String role     = req.session().attribute("userRole");
-            if (username == null || !"ESTUDIANTE".equals(role)) {
-                res.redirect("/login");
-                return null;
-            }
-
-            List<Map> studentRows = Base.findAll(
-                "SELECT s.usuario_id FROM student s JOIN users u ON u.id = s.usuario_id WHERE u.nombre_usuario = ?",
-                username
-            );
-            if (studentRows.isEmpty()) { res.redirect("/dashboard"); return null; }
-            int alumnoId = ((Number) studentRows.get(0).get("usuario_id")).intValue();
-
-            // Materias en las que el alumno está INSCRIPTO (cursando)
-            List<Map> materiasInscriptas = Base.findAll(
-                "SELECT ea.materia_codigo, m.nombre FROM Estado_Academico ea " +
-                "JOIN Materia m ON m.codigo = ea.materia_codigo " +
-                "WHERE ea.usuario_id = ? AND ea.estado = 'INSCRIPTO'",
-                alumnoId
-            );
-
-            List<Map<String, Object>> materiasConAnuncios = new ArrayList<>();
-            for (Map mat : materiasInscriptas) {
-                int codigo = ((Number) mat.get("materia_codigo")).intValue();
-
-                // Buscar el período vigente de esta materia
-                List<Map> periodoRows = Base.findAll(
-                    "SELECT id FROM Materia_Periodo WHERE materia_codigo = ? LIMIT 1", codigo
-                );
-                if (periodoRows.isEmpty()) continue;
-                int periodoId = ((Number) periodoRows.get(0).get("id")).intValue();
-
-                // Anuncios del período
-                List<Map> anunciosDB = Base.findAll(
-                    "SELECT a.id, a.tipo, a.titulo, a.contenido, a.fecha_examen " +
-                    "FROM Anuncio a WHERE a.materia_periodo_id = ? ORDER BY a.fecha_creacion DESC",
-                    periodoId
-                );
-
-                List<Map<String, Object>> anunciosList = new ArrayList<>();
-                for (Map a : anunciosDB) {
-                    Map<String, Object> anuncioMap = new HashMap<>();
-                    anuncioMap.put("id",          a.get("id"));
-                    anuncioMap.put("tipo",         a.get("tipo"));
-                    anuncioMap.put("titulo",       a.get("titulo"));
-                    anuncioMap.put("contenido",    a.get("contenido"));
-                    anuncioMap.put("fechaExamen",  a.get("fecha_examen"));
-                    anuncioMap.put("esExamen",     "EXAMEN".equals(a.get("tipo")));
-
-                    // Verificar si el alumno ya se inscribió a este parcial
-                    if ("EXAMEN".equals(a.get("tipo"))) {
-                        int anuncioId = ((Number) a.get("id")).intValue();
-                        List<Map> yaInscripto = Base.findAll(
-                            "SELECT id FROM Inscripcion_Parcial WHERE usuario_id = ? AND anuncio_id = ?",
-                            alumnoId, anuncioId
-                        );
-                        anuncioMap.put("yaInscripto", !yaInscripto.isEmpty());
-                    }
-                    anunciosList.add(anuncioMap);
+        get(
+            "/estudiante/aula-virtual",
+            (req, res) -> {
+                String username = req
+                    .session()
+                    .attribute("currentUserUsername");
+                String role = req.session().attribute("userRole");
+                if (username == null || !"ESTUDIANTE".equals(role)) {
+                    res.redirect("/login");
+                    return null;
                 }
 
-                Map<String, Object> materiaMap = new HashMap<>();
-                materiaMap.put("codigo",    codigo);
-                materiaMap.put("nombre",    mat.get("nombre"));
-                materiaMap.put("anuncios",  anunciosList);
-                materiasConAnuncios.add(materiaMap);
-            }
+                List<Map> studentRows = Base.findAll(
+                    "SELECT s.usuario_id FROM student s JOIN users u ON u.id = s.usuario_id WHERE u.nombre_usuario = ?",
+                    username
+                );
+                if (studentRows.isEmpty()) {
+                    res.redirect("/dashboard");
+                    return null;
+                }
+                int alumnoId = (
+                    (Number) studentRows.get(0).get("usuario_id")
+                ).intValue();
 
-            Map<String, Object> model = new HashMap<>();
-            model.put("materias", materiasConAnuncios);
-            String success = req.queryParams("success");
-            String error   = req.queryParams("error");
-            if (success != null) model.put("successMessage", success);
-            if (error   != null) model.put("errorMessage",   error);
+                // Materias en las que el alumno está INSCRIPTO (cursando)
+                List<Map> materiasInscriptas = Base.findAll(
+                    "SELECT ea.materia_codigo, m.nombre FROM Estado_Academico ea " +
+                        "JOIN Materia m ON m.codigo = ea.materia_codigo " +
+                        "WHERE ea.usuario_id = ? AND ea.estado = 'INSCRIPTO'",
+                    alumnoId
+                );
 
-            return new ModelAndView(model, "aula_virtual.mustache");
-        }, new MustacheTemplateEngine());
+                List<Map<String, Object>> materiasConAnuncios =
+                    new ArrayList<>();
+                for (Map mat : materiasInscriptas) {
+                    int codigo = (
+                        (Number) mat.get("materia_codigo")
+                    ).intValue();
+
+                    // Buscar el período vigente de esta materia
+                    List<Map> periodoRows = Base.findAll(
+                        "SELECT id FROM Materia_Periodo WHERE materia_codigo = ? LIMIT 1",
+                        codigo
+                    );
+                    if (periodoRows.isEmpty()) continue;
+                    int periodoId = (
+                        (Number) periodoRows.get(0).get("id")
+                    ).intValue();
+
+                    // Anuncios del período
+                    List<Map> anunciosDB = Base.findAll(
+                        "SELECT a.id, a.tipo, a.titulo, a.contenido, a.fecha_examen " +
+                            "FROM Anuncio a WHERE a.materia_periodo_id = ? ORDER BY a.fecha_creacion DESC",
+                        periodoId
+                    );
+
+                    List<Map<String, Object>> anunciosList = new ArrayList<>();
+                    for (Map a : anunciosDB) {
+                        Map<String, Object> anuncioMap = new HashMap<>();
+                        anuncioMap.put("id", a.get("id"));
+                        anuncioMap.put("tipo", a.get("tipo"));
+                        anuncioMap.put("titulo", a.get("titulo"));
+                        anuncioMap.put("contenido", a.get("contenido"));
+                        anuncioMap.put("fechaExamen", a.get("fecha_examen"));
+                        anuncioMap.put(
+                            "esExamen",
+                            "EXAMEN".equals(a.get("tipo"))
+                        );
+
+                        // Verificar si el alumno ya se inscribió a este parcial
+                        if ("EXAMEN".equals(a.get("tipo"))) {
+                            int anuncioId = ((Number) a.get("id")).intValue();
+                            List<Map> yaInscripto = Base.findAll(
+                                "SELECT id FROM Inscripcion_Parcial WHERE usuario_id = ? AND anuncio_id = ?",
+                                alumnoId,
+                                anuncioId
+                            );
+                            anuncioMap.put(
+                                "yaInscripto",
+                                !yaInscripto.isEmpty()
+                            );
+                        }
+                        anunciosList.add(anuncioMap);
+                    }
+
+                    Map<String, Object> materiaMap = new HashMap<>();
+                    materiaMap.put("codigo", codigo);
+                    materiaMap.put("nombre", mat.get("nombre"));
+                    materiaMap.put("anuncios", anunciosList);
+                    materiasConAnuncios.add(materiaMap);
+                }
+
+                Map<String, Object> model = new HashMap<>();
+                model.put("materias", materiasConAnuncios);
+                String success = req.queryParams("success");
+                String error = req.queryParams("error");
+                if (success != null) model.put("successMessage", success);
+                if (error != null) model.put("errorMessage", error);
+
+                return new ModelAndView(model, "aula_virtual.mustache");
+            },
+            new MustacheTemplateEngine()
+        );
 
         // POST /estudiante/inscripcion-parcial — confirma asistencia a un parcial
         post("/estudiante/inscripcion-parcial", (req, res) -> {
             String username = req.session().attribute("currentUserUsername");
-            String role     = req.session().attribute("userRole");
+            String role = req.session().attribute("userRole");
             if (username == null || !"ESTUDIANTE".equals(role)) {
                 res.status(403);
                 return "No autorizado";
@@ -2482,13 +3069,23 @@ get("/docente/materia/:materiaId/contenido", (req, res) -> {
                 "SELECT s.usuario_id FROM student s JOIN users u ON u.id = s.usuario_id WHERE u.nombre_usuario = ?",
                 username
             );
-            if (studentRows.isEmpty()) { res.redirect("/dashboard"); return null; }
-            int alumnoId  = ((Number) studentRows.get(0).get("usuario_id")).intValue();
+            if (studentRows.isEmpty()) {
+                res.redirect("/dashboard");
+                return null;
+            }
+            int alumnoId = (
+                (Number) studentRows.get(0).get("usuario_id")
+            ).intValue();
             String anuncioIdStr = req.queryParams("anuncio_id");
 
             if (anuncioIdStr == null || anuncioIdStr.isEmpty()) {
-                res.redirect("/estudiante/aula-virtual?error=" +
-                    URLEncoder.encode("Parcial no especificado.", StandardCharsets.UTF_8.toString()));
+                res.redirect(
+                    "/estudiante/aula-virtual?error=" +
+                        URLEncoder.encode(
+                            "Parcial no especificado.",
+                            StandardCharsets.UTF_8.toString()
+                        )
+                );
                 return null;
             }
 
@@ -2496,22 +3093,42 @@ get("/docente/materia/:materiaId/contenido", (req, res) -> {
                 int anuncioId = Integer.parseInt(anuncioIdStr);
                 // Verificar que el anuncio sea de tipo EXAMEN
                 List<Map> anuncioRows = Base.findAll(
-                    "SELECT tipo FROM Anuncio WHERE id = ?", anuncioId
+                    "SELECT tipo FROM Anuncio WHERE id = ?",
+                    anuncioId
                 );
-                if (anuncioRows.isEmpty() || !"EXAMEN".equals(anuncioRows.get(0).get("tipo"))) {
-                    res.redirect("/estudiante/aula-virtual?error=" +
-                        URLEncoder.encode("El anuncio no corresponde a un parcial.", StandardCharsets.UTF_8.toString()));
+                if (
+                    anuncioRows.isEmpty() ||
+                    !"EXAMEN".equals(anuncioRows.get(0).get("tipo"))
+                ) {
+                    res.redirect(
+                        "/estudiante/aula-virtual?error=" +
+                            URLEncoder.encode(
+                                "El anuncio no corresponde a un parcial.",
+                                StandardCharsets.UTF_8.toString()
+                            )
+                    );
                     return null;
                 }
                 Base.exec(
                     "INSERT INTO Inscripcion_Parcial (usuario_id, anuncio_id) VALUES (?, ?)",
-                    alumnoId, anuncioId
+                    alumnoId,
+                    anuncioId
                 );
-                res.redirect("/estudiante/aula-virtual?success=" +
-                    URLEncoder.encode("Asistencia confirmada al parcial.", StandardCharsets.UTF_8.toString()));
+                res.redirect(
+                    "/estudiante/aula-virtual?success=" +
+                        URLEncoder.encode(
+                            "Asistencia confirmada al parcial.",
+                            StandardCharsets.UTF_8.toString()
+                        )
+                );
             } catch (Exception e) {
-                res.redirect("/estudiante/aula-virtual?error=" +
-                    URLEncoder.encode("Ya confirmaste asistencia a este parcial.", StandardCharsets.UTF_8.toString()));
+                res.redirect(
+                    "/estudiante/aula-virtual?error=" +
+                        URLEncoder.encode(
+                            "Ya confirmaste asistencia a este parcial.",
+                            StandardCharsets.UTF_8.toString()
+                        )
+                );
             }
             return null;
         });
@@ -2521,109 +3138,132 @@ get("/docente/materia/:materiaId/contenido", (req, res) -> {
         // ==========================================
 
         // GET /docente/notas-finales — lista las mesas de examen del docente
-        get("/docente/notas-finales", (req, res) -> {
-            String role = req.session().attribute("userRole");
-            if (role == null || !"DOCENTE".equals(role)) {
-                res.redirect("/dashboard");
-                return null;
-            }
-            Integer userId  = req.session().attribute("userId");
-            Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
-            if (teacher == null) { res.redirect("/dashboard"); return null; }
-            int teacherId = teacher.getInteger("usuario_id");
+        get(
+            "/docente/notas-finales",
+            (req, res) -> {
+                String role = req.session().attribute("userRole");
+                if (role == null || !"DOCENTE".equals(role)) {
+                    res.redirect("/dashboard");
+                    return null;
+                }
+                Integer userId = req.session().attribute("userId");
+                Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
+                if (teacher == null) {
+                    res.redirect("/dashboard");
+                    return null;
+                }
+                int teacherId = teacher.getInteger("usuario_id");
 
-            // Mesas de materias que el docente tiene asignadas
-            List<Map> mesas = Base.findAll(
-                "SELECT me.id, me.fecha, m.nombre AS nombreMateria, me.materia_codigo " +
-                "FROM mesas_examen me " +
-                "JOIN Materia m ON m.codigo = me.materia_codigo " +
-                "JOIN Docente_Materia dm ON dm.materia_id = me.materia_codigo " +
-                "WHERE dm.teacher_id = ? " +
-                "ORDER BY me.fecha DESC",
-                teacherId
-            );
+                // Mesas de materias que el docente tiene asignadas
+                List<Map> mesas = Base.findAll(
+                    "SELECT me.id, me.fecha, m.nombre AS nombreMateria, me.materia_codigo " +
+                        "FROM mesas_examen me " +
+                        "JOIN Materia m ON m.codigo = me.materia_codigo " +
+                        "JOIN Docente_Materia dm ON dm.materia_id = me.materia_codigo " +
+                        "WHERE dm.teacher_id = ? " +
+                        "ORDER BY me.fecha DESC",
+                    teacherId
+                );
 
-            List<Map<String, Object>> mesasList = new ArrayList<>();
-            for (Map m : mesas) {
-                Map<String, Object> mm = new HashMap<>();
-                mm.put("id",             ((Number) m.get("id")).intValue());
-                mm.put("fecha",          m.get("fecha"));
-                mm.put("nombreMateria",  m.get("nombreMateria"));
-                mm.put("materiaCodigo",  m.get("materia_codigo"));
-                mesasList.add(mm);
-            }
+                List<Map<String, Object>> mesasList = new ArrayList<>();
+                for (Map m : mesas) {
+                    Map<String, Object> mm = new HashMap<>();
+                    mm.put("id", ((Number) m.get("id")).intValue());
+                    mm.put("fecha", m.get("fecha"));
+                    mm.put("nombreMateria", m.get("nombreMateria"));
+                    mm.put("materiaCodigo", m.get("materia_codigo"));
+                    mesasList.add(mm);
+                }
 
-            Map<String, Object> model = new HashMap<>();
-            model.put("mesas", mesasList);
-            String success = req.queryParams("success");
-            String error   = req.queryParams("error");
-            if (success != null) model.put("successMessage", success);
-            if (error   != null) model.put("errorMessage",   error);
+                Map<String, Object> model = new HashMap<>();
+                model.put("mesas", mesasList);
+                String success = req.queryParams("success");
+                String error = req.queryParams("error");
+                if (success != null) model.put("successMessage", success);
+                if (error != null) model.put("errorMessage", error);
 
-            return new ModelAndView(model, "carga_finales.mustache");
-        }, new MustacheTemplateEngine());
+                return new ModelAndView(model, "carga_finales.mustache");
+            },
+            new MustacheTemplateEngine()
+        );
 
         // GET /docente/notas-finales/:mesaId — muestra inscriptos a esa mesa
-        get("/docente/notas-finales/:mesaId", (req, res) -> {
-            String role = req.session().attribute("userRole");
-            if (role == null || !"DOCENTE".equals(role)) {
-                res.redirect("/dashboard");
-                return null;
-            }
-            Integer userId  = req.session().attribute("userId");
-            Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
-            if (teacher == null) { res.redirect("/dashboard"); return null; }
-            int teacherId = teacher.getInteger("usuario_id");
-            int mesaId    = Integer.parseInt(req.params("mesaId"));
+        get(
+            "/docente/notas-finales/:mesaId",
+            (req, res) -> {
+                String role = req.session().attribute("userRole");
+                if (role == null || !"DOCENTE".equals(role)) {
+                    res.redirect("/dashboard");
+                    return null;
+                }
+                Integer userId = req.session().attribute("userId");
+                Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
+                if (teacher == null) {
+                    res.redirect("/dashboard");
+                    return null;
+                }
+                int teacherId = teacher.getInteger("usuario_id");
+                int mesaId = Integer.parseInt(req.params("mesaId"));
 
-            // Verificar que la mesa pertenezca a una materia del docente
-            List<Map> mesaRows = Base.findAll(
-                "SELECT me.id, me.fecha, me.materia_codigo, m.nombre AS nombreMateria " +
-                "FROM mesas_examen me JOIN Materia m ON m.codigo = me.materia_codigo " +
-                "JOIN Docente_Materia dm ON dm.materia_id = me.materia_codigo " +
-                "WHERE me.id = ? AND dm.teacher_id = ?",
-                mesaId, teacherId
-            );
-            if (mesaRows.isEmpty()) {
-                res.redirect("/docente/notas-finales?error=" +
-                    URLEncoder.encode("No tenés acceso a esa mesa.", StandardCharsets.UTF_8.toString()));
-                return null;
-            }
-            Map mesa = mesaRows.get(0);
+                // Verificar que la mesa pertenezca a una materia del docente
+                List<Map> mesaRows = Base.findAll(
+                    "SELECT me.id, me.fecha, me.materia_codigo, m.nombre AS nombreMateria " +
+                        "FROM mesas_examen me JOIN Materia m ON m.codigo = me.materia_codigo " +
+                        "JOIN Docente_Materia dm ON dm.materia_id = me.materia_codigo " +
+                        "WHERE me.id = ? AND dm.teacher_id = ?",
+                    mesaId,
+                    teacherId
+                );
+                if (mesaRows.isEmpty()) {
+                    res.redirect(
+                        "/docente/notas-finales?error=" +
+                            URLEncoder.encode(
+                                "No tenés acceso a esa mesa.",
+                                StandardCharsets.UTF_8.toString()
+                            )
+                    );
+                    return null;
+                }
+                Map mesa = mesaRows.get(0);
 
-            // Solo los inscriptos a esta mesa específica
-            List<Map> inscriptosDB = Base.findAll(
-                "SELECT ie.usuario_id, u.nombre, u.apellido, s.legajo " +
-                "FROM inscripciones_examen ie " +
-                "JOIN users u ON u.id = ie.usuario_id " +
-                "JOIN student s ON s.usuario_id = ie.usuario_id " +
-                "WHERE ie.mesa_id = ? " +
-                "ORDER BY u.apellido ASC",
-                mesaId
-            );
+                // Solo los inscriptos a esta mesa específica
+                List<Map> inscriptosDB = Base.findAll(
+                    "SELECT ie.usuario_id, u.nombre, u.apellido, s.legajo " +
+                        "FROM inscripciones_examen ie " +
+                        "JOIN users u ON u.id = ie.usuario_id " +
+                        "JOIN student s ON s.usuario_id = ie.usuario_id " +
+                        "WHERE ie.mesa_id = ? " +
+                        "ORDER BY u.apellido ASC",
+                    mesaId
+                );
 
-            List<Map<String, Object>> inscriptosList = new ArrayList<>();
-            for (Map i : inscriptosDB) {
-                Map<String, Object> im = new HashMap<>();
-                im.put("usuarioId", ((Number) i.get("usuario_id")).intValue());
-                im.put("nombre",    i.get("nombre") + " " + i.get("apellido"));
-                im.put("legajo",    i.get("legajo"));
-                inscriptosList.add(im);
-            }
+                List<Map<String, Object>> inscriptosList = new ArrayList<>();
+                for (Map i : inscriptosDB) {
+                    Map<String, Object> im = new HashMap<>();
+                    im.put(
+                        "usuarioId",
+                        ((Number) i.get("usuario_id")).intValue()
+                    );
+                    im.put("nombre", i.get("nombre") + " " + i.get("apellido"));
+                    im.put("legajo", i.get("legajo"));
+                    inscriptosList.add(im);
+                }
 
-            Map<String, Object> model = new HashMap<>();
-            model.put("mesaId",        mesaId);
-            model.put("fecha",         mesa.get("fecha"));
-            model.put("nombreMateria", mesa.get("nombreMateria"));
-            model.put("materiaCodigo", mesa.get("materia_codigo"));
-            model.put("inscriptos",    inscriptosList);
-            String success = req.queryParams("success");
-            String error   = req.queryParams("error");
-            if (success != null) model.put("successMessage", success);
-            if (error   != null) model.put("errorMessage",   error);
+                Map<String, Object> model = new HashMap<>();
+                model.put("mesaId", mesaId);
+                model.put("fecha", mesa.get("fecha"));
+                model.put("nombreMateria", mesa.get("nombreMateria"));
+                model.put("materiaCodigo", mesa.get("materia_codigo"));
+                model.put("inscriptos", inscriptosList);
+                String success = req.queryParams("success");
+                String error = req.queryParams("error");
+                if (success != null) model.put("successMessage", success);
+                if (error != null) model.put("errorMessage", error);
 
-            return new ModelAndView(model, "carga_finales_acta.mustache");
-        }, new MustacheTemplateEngine());
+                return new ModelAndView(model, "carga_finales_acta.mustache");
+            },
+            new MustacheTemplateEngine()
+        );
 
         // POST /docente/notas-finales/:mesaId — guarda calificación del final
         post("/docente/notas-finales/:mesaId", (req, res) -> {
@@ -2632,50 +3272,77 @@ get("/docente/materia/:materiaId/contenido", (req, res) -> {
                 res.redirect("/dashboard");
                 return null;
             }
-            Integer userId  = req.session().attribute("userId");
+            Integer userId = req.session().attribute("userId");
             Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
-            if (teacher == null) { res.redirect("/dashboard"); return null; }
-            int teacherId  = teacher.getInteger("usuario_id");
-            int mesaId     = Integer.parseInt(req.params("mesaId"));
+            if (teacher == null) {
+                res.redirect("/dashboard");
+                return null;
+            }
+            int teacherId = teacher.getInteger("usuario_id");
+            int mesaId = Integer.parseInt(req.params("mesaId"));
 
             String studentIdStr = req.queryParams("student_id");
-            String valorStr     = req.queryParams("valor");
+            String valorStr = req.queryParams("valor");
 
-            if (studentIdStr == null || valorStr == null || studentIdStr.isEmpty() || valorStr.isEmpty()) {
-                res.redirect("/docente/notas-finales/" + mesaId + "?error=" +
-                    URLEncoder.encode("Datos incompletos.", StandardCharsets.UTF_8.toString()));
+            if (
+                studentIdStr == null ||
+                valorStr == null ||
+                studentIdStr.isEmpty() ||
+                valorStr.isEmpty()
+            ) {
+                res.redirect(
+                    "/docente/notas-finales/" +
+                        mesaId +
+                        "?error=" +
+                        URLEncoder.encode(
+                            "Datos incompletos.",
+                            StandardCharsets.UTF_8.toString()
+                        )
+                );
                 return null;
             }
 
             try {
-                int    studentId = Integer.parseInt(studentIdStr);
-                double valor     = Double.parseDouble(valorStr);
+                int studentId = Integer.parseInt(studentIdStr);
+                double valor = Double.parseDouble(valorStr);
 
-                if (valor < 0 || valor > 10) throw new IllegalArgumentException("Nota fuera de rango.");
+                if (valor < 0 || valor > 10) throw new IllegalArgumentException(
+                    "Nota fuera de rango."
+                );
 
                 // Obtener el período de la materia desde la mesa
                 List<Map> mesaRows = Base.findAll(
                     "SELECT me.materia_codigo FROM mesas_examen me " +
-                    "JOIN Docente_Materia dm ON dm.materia_id = me.materia_codigo " +
-                    "WHERE me.id = ? AND dm.teacher_id = ?",
-                    mesaId, teacherId
+                        "JOIN Docente_Materia dm ON dm.materia_id = me.materia_codigo " +
+                        "WHERE me.id = ? AND dm.teacher_id = ?",
+                    mesaId,
+                    teacherId
                 );
-                if (mesaRows.isEmpty()) throw new IllegalStateException("Mesa no autorizada.");
-                int materiaCodigo = ((Number) mesaRows.get(0).get("materia_codigo")).intValue();
+                if (mesaRows.isEmpty()) throw new IllegalStateException(
+                    "Mesa no autorizada."
+                );
+                int materiaCodigo = (
+                    (Number) mesaRows.get(0).get("materia_codigo")
+                ).intValue();
 
                 List<Map> periodoRows = Base.findAll(
-                    "SELECT id FROM Materia_Periodo WHERE materia_codigo = ? LIMIT 1", materiaCodigo
+                    "SELECT id FROM Materia_Periodo WHERE materia_codigo = ? LIMIT 1",
+                    materiaCodigo
                 );
-                if (periodoRows.isEmpty()) throw new IllegalStateException("No hay período activo.");
-                int periodoId = ((Number) periodoRows.get(0).get("id")).intValue();
+                if (periodoRows.isEmpty()) throw new IllegalStateException(
+                    "No hay período activo."
+                );
+                int periodoId = (
+                    (Number) periodoRows.get(0).get("id")
+                ).intValue();
 
                 // Guardar la nota con instancia FINAL
                 Nota nota = new Nota();
                 nota.set("materia_periodo_id", periodoId);
-                nota.set("student_id",         studentId);
-                nota.set("teacher_id",         teacherId);
-                nota.set("valor",              valor);
-                nota.set("instancia",          "FINAL");
+                nota.set("student_id", studentId);
+                nota.set("teacher_id", teacherId);
+                nota.set("valor", valor);
+                nota.set("instancia", "FINAL");
                 nota.saveIt();
 
                 // Determinar nuevo estado: aprueba con >= 4
@@ -2683,22 +3350,37 @@ get("/docente/materia/:materiaId/contenido", (req, res) -> {
 
                 Base.exec(
                     "INSERT INTO Estado_Academico (usuario_id, materia_codigo, estado) VALUES (?, ?, ?) " +
-                    "ON DUPLICATE KEY UPDATE estado = VALUES(estado)",
-                    studentId, materiaCodigo, nuevoEstado
+                        "ON DUPLICATE KEY UPDATE estado = VALUES(estado)",
+                    studentId,
+                    materiaCodigo,
+                    nuevoEstado
                 );
 
-                res.redirect("/docente/notas-finales/" + mesaId + "?success=" +
-                    URLEncoder.encode("Calificación registrada.", StandardCharsets.UTF_8.toString()));
+                res.redirect(
+                    "/docente/notas-finales/" +
+                        mesaId +
+                        "?success=" +
+                        URLEncoder.encode(
+                            "Calificación registrada.",
+                            StandardCharsets.UTF_8.toString()
+                        )
+                );
             } catch (Exception e) {
                 e.printStackTrace();
-                res.redirect("/docente/notas-finales/" + mesaId + "?error=" +
-                    URLEncoder.encode("Error: " + e.getMessage(), StandardCharsets.UTF_8.toString()));
+                res.redirect(
+                    "/docente/notas-finales/" +
+                        mesaId +
+                        "?error=" +
+                        URLEncoder.encode(
+                            "Error: " + e.getMessage(),
+                            StandardCharsets.UTF_8.toString()
+                        )
+                );
             }
             return null;
         });
 
         // Actualizar filtro de inscripción a exámenes para excluir PROMOCION y APROBADO
         // (el GET /estudiante/inscripcion/examen ya filtra correctamente: solo REGULAR o LIBRE pasan)
-
-    } 
+    }
 }
