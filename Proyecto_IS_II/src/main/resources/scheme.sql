@@ -1,14 +1,3 @@
-<<<<<<< HEAD
-DROP TABLE IF EXISTS sesion;
-DROP TABLE IF EXISTS student;
-DROP TABLE IF EXISTS teacher;
-DROP TABLE IF EXISTS secretariaAcademica;
-DROP TABLE IF EXISTS gestorSistema;
-DROP TABLE IF EXISTS users;
-
--- Creación de la Tabla Base: Usuario
--- Usamos ENUM para Nivel_Acceso como pide el catálogo.
-=======
 SET FOREIGN_KEY_CHECKS = 0;
 USE proyecto_is_ii;
 DROP TABLE IF EXISTS sesion;
@@ -33,9 +22,8 @@ DROP TABLE IF EXISTS Carrera;
 DROP TABLE IF EXISTS inscripciones_examen;
 DROP TABLE IF EXISTS mesas_examen;
 DROP TABLE IF EXISTS Estado_Academico;
-
+ 
 -- Creación de la Tabla Base: Usuario
->>>>>>> luka
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     dni VARCHAR(20) NOT NULL UNIQUE,
@@ -48,23 +36,11 @@ CREATE TABLE users (
     nivel_acceso ENUM('ESTUDIANTE', 'DOCENTE', 'SECRETARIA', 'ADMIN') NOT NULL,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
-
-<<<<<<< HEAD
-
--- Tabla Estudiante
--- Relación 1:1 con Usuario. El id del estudiante es el mismo id del usuario.
-=======
--- Tabla Estudiante
->>>>>>> luka
+ 
 CREATE TABLE student (
     usuario_id INT PRIMARY KEY,
     legajo VARCHAR(20) NOT NULL UNIQUE,
     tipo_estudiante ENUM('REGULAR', 'VOCACIONAL', 'INTERCAMBIO') NOT NULL,
-<<<<<<< HEAD
-    CONSTRAINT fk_estudiante_usuario 
-        FOREIGN KEY (usuario_id) REFERENCES users(id) 
-        ON DELETE CASCADE
-=======
     plan_estudio_id INT NOT NULL,
     CONSTRAINT fk_estudiante_usuario 
         FOREIGN KEY (usuario_id) REFERENCES users(id) 
@@ -72,33 +48,20 @@ CREATE TABLE student (
     CONSTRAINT fk_estudiante_plan
         FOREIGN KEY (plan_estudio_id) REFERENCES Plan_Estudio(id)
         ON DELETE RESTRICT
->>>>>>> luka
 ) ENGINE=InnoDB;
-
--- Tabla Docente
+ 
 CREATE TABLE teacher (
     usuario_id INT PRIMARY KEY,
-<<<<<<< HEAD
+    legajo_docente VARCHAR(50) NOT NULL UNIQUE,
     cuil VARCHAR(20) NOT NULL UNIQUE,
+    email VARCHAR(150) NOT NULL UNIQUE,
     titulo VARCHAR(100),
-    CONSTRAINT fk_docente_usuario 
+    especialidad VARCHAR(150),
+    CONSTRAINT fk_teacher_user 
         FOREIGN KEY (usuario_id) REFERENCES users(id) 
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
-
-CREATE TABLE teacher (
-    usuario_id INT PRIMARY KEY,
-    legajo_docente VARCHAR(50) NOT NULL UNIQUE,
-    cuil VARCHAR(20) NOT NULL UNIQUE, -- Agregado nuevamente
-=======
-    legajo_docente VARCHAR(50) NOT NULL UNIQUE,
-    cuil VARCHAR(20) NOT NULL UNIQUE,
->>>>>>> luka
-    email VARCHAR(150) NOT NULL UNIQUE,
-    especialidad VARCHAR(150),
-    CONSTRAINT fk_teacher_user FOREIGN KEY (usuario_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
+ 
 -- Tabla SecretariaAcademica
 CREATE TABLE secretariaAcademica (
     usuario_id INT PRIMARY KEY,
@@ -108,7 +71,7 @@ CREATE TABLE secretariaAcademica (
         FOREIGN KEY (usuario_id) REFERENCES users(id) 
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
-
+ 
 -- Tabla GestorSistema (Administrador IT)
 CREATE TABLE gestorSistema (
     usuario_id INT PRIMARY KEY,
@@ -117,12 +80,8 @@ CREATE TABLE gestorSistema (
         FOREIGN KEY (usuario_id) REFERENCES users(id) 
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
-
+ 
 -- Tabla Sesion
-<<<<<<< HEAD
--- Implementa ON DELETE CASCADE para que si se borra el usuario, se borren sus sesiones.
-=======
->>>>>>> luka
 CREATE TABLE sesion (
     id INT AUTO_INCREMENT PRIMARY KEY,
     usuario_id INT NOT NULL,
@@ -133,18 +92,14 @@ CREATE TABLE sesion (
         FOREIGN KEY (usuario_id) REFERENCES users(id) 
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
-
-<<<<<<< HEAD
--- SCRIPT DE INICIALIZACIÓN (SEED)
--- Creamos el superusuario por defecto para todo el equipo
-=======
+ 
 CREATE TABLE Carrera (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(150) NOT NULL UNIQUE,
     duracion_anios INT NOT NULL,
     titulo_otorgado VARCHAR(150) NOT NULL
 ) ENGINE=InnoDB;
-
+ 
 CREATE TABLE Plan_Estudio (
     id INT AUTO_INCREMENT PRIMARY KEY,
     carrera_id INT NOT NULL,
@@ -152,7 +107,7 @@ CREATE TABLE Plan_Estudio (
     estado ENUM('VIGENTE', 'OBSOLETO') DEFAULT 'VIGENTE',
     CONSTRAINT fk_plan_carrera FOREIGN KEY (carrera_id) REFERENCES Carrera(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
-
+ 
 CREATE TABLE Materia (
     codigo INT PRIMARY KEY, 
     plan_estudio_id INT NOT NULL,
@@ -161,7 +116,7 @@ CREATE TABLE Materia (
     carga_horaria_total INT,
     CONSTRAINT fk_materia_plan FOREIGN KEY (plan_estudio_id) REFERENCES Plan_Estudio(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
-
+ 
 CREATE TABLE Docente_Materia (
     id INT AUTO_INCREMENT PRIMARY KEY,
     teacher_id INT NOT NULL,
@@ -170,7 +125,7 @@ CREATE TABLE Docente_Materia (
     CONSTRAINT fk_docente_materia_materia FOREIGN KEY (materia_id) REFERENCES Materia(codigo) ON DELETE CASCADE,
     UNIQUE KEY unique_teacher_materia (teacher_id, materia_id)
 ) ENGINE=InnoDB;
-
+ 
 CREATE TABLE Correlatividad (
     materia_codigo INT NOT NULL,
     materia_correlativa_codigo INT NOT NULL,
@@ -181,7 +136,7 @@ CREATE TABLE Correlatividad (
     CONSTRAINT fk_corr_requisito FOREIGN KEY (materia_correlativa_codigo) REFERENCES Materia(codigo) ON DELETE CASCADE,
     CONSTRAINT chk_no_auto_correlativa CHECK (materia_codigo != materia_correlativa_codigo)
 ) ENGINE=InnoDB;
-
+ 
 CREATE TABLE Materia_Periodo (
     id INT AUTO_INCREMENT PRIMARY KEY,
     materia_codigo INT NOT NULL,         
@@ -189,7 +144,7 @@ CREATE TABLE Materia_Periodo (
     tipo_cuatrimestre ENUM('PRIMER_CUATRIMESTRE', 'SEGUNDO_CUATRIMESTRE', 'ANUAL', 'VERANO') NOT NULL,
     CONSTRAINT fk_periodo_materia FOREIGN KEY (materia_codigo) REFERENCES Materia(codigo) ON DELETE CASCADE
 ) ENGINE=InnoDB;
-
+ 
 CREATE TABLE Docente_Carrera (
     teacher_id INT NOT NULL,
     carrera_id INT NOT NULL,
@@ -197,14 +152,14 @@ CREATE TABLE Docente_Carrera (
     CONSTRAINT fk_dc_teacher  FOREIGN KEY (teacher_id)  REFERENCES teacher(usuario_id)  ON DELETE CASCADE,
     CONSTRAINT fk_dc_carrera  FOREIGN KEY (carrera_id)  REFERENCES Carrera(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
-
+ 
 CREATE TABLE Aula (
     id INT AUTO_INCREMENT PRIMARY KEY,
     numero_nombre VARCHAR(50) NOT NULL UNIQUE,
     capacidad INT NOT NULL,
     estado_aula ENUM('DISPONIBLE', 'OCUPADA', 'EN_MANTENIMIENTO', 'CLAUSURADA') DEFAULT 'DISPONIBLE'
 ) ENGINE=InnoDB;
-
+ 
 CREATE TABLE SolicitudAula (
     id INT AUTO_INCREMENT PRIMARY KEY,
     aula_id INT NOT NULL,
@@ -216,7 +171,7 @@ CREATE TABLE SolicitudAula (
     CONSTRAINT fk_solicitud_aula FOREIGN KEY (aula_id) REFERENCES Aula(id) ON DELETE CASCADE,
     CONSTRAINT fk_solicitud_materia FOREIGN KEY (materia_periodo_id) REFERENCES Materia_Periodo(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
-
+ 
 CREATE TABLE Anuncio (
     id INT AUTO_INCREMENT PRIMARY KEY,
     materia_periodo_id INT NOT NULL,
@@ -228,8 +183,8 @@ CREATE TABLE Anuncio (
     fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (materia_periodo_id) REFERENCES Materia_Periodo(id) ON DELETE CASCADE,
     FOREIGN KEY (teacher_id) REFERENCES teacher(usuario_id) ON DELETE CASCADE
-)ENGINE=InnoDB;
-
+) ENGINE=InnoDB;
+ 
 CREATE TABLE Nota (
     id INT AUTO_INCREMENT PRIMARY KEY,
     materia_periodo_id INT NOT NULL,
@@ -241,8 +196,8 @@ CREATE TABLE Nota (
     FOREIGN KEY (materia_periodo_id) REFERENCES Materia_Periodo(id) ON DELETE CASCADE,
     FOREIGN KEY (student_id) REFERENCES student(usuario_id) ON DELETE CASCADE,
     FOREIGN KEY (teacher_id) REFERENCES teacher(usuario_id) ON DELETE CASCADE
-)ENGINE=InnoDB;
-
+) ENGINE=InnoDB;
+ 
 CREATE TABLE Aula_Asignacion (
     id INT AUTO_INCREMENT PRIMARY KEY,
     materia_periodo_id INT NOT NULL,
@@ -251,16 +206,15 @@ CREATE TABLE Aula_Asignacion (
     fecha_asignacion DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (materia_periodo_id) REFERENCES Materia_Periodo(id) ON DELETE CASCADE,
     FOREIGN KEY (teacher_id) REFERENCES teacher(usuario_id) ON DELETE CASCADE
-)ENGINE=InnoDB;
-
-
+) ENGINE=InnoDB;
+ 
 CREATE TABLE IF NOT EXISTS mesas_examen (
     id INT AUTO_INCREMENT PRIMARY KEY,
     materia_codigo INT NOT NULL,
     fecha DATE NOT NULL,
     CONSTRAINT fk_mesa_materia FOREIGN KEY (materia_codigo) REFERENCES Materia(codigo) ON DELETE CASCADE
 ) ENGINE=InnoDB;
-
+ 
 CREATE TABLE IF NOT EXISTS inscripciones_examen (
     id INT AUTO_INCREMENT PRIMARY KEY,
     usuario_id INT NOT NULL,
@@ -268,9 +222,9 @@ CREATE TABLE IF NOT EXISTS inscripciones_examen (
     fecha_inscripcion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_inscripcion_alumno FOREIGN KEY (usuario_id) REFERENCES student(usuario_id) ON DELETE CASCADE,
     CONSTRAINT fk_inscripcion_mesa FOREIGN KEY (mesa_id) REFERENCES mesas_examen(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_alumno_mesa (usuario_id, mesa_id) -- Evita duplicados
-    ) ENGINE=InnoDB;
-
+    UNIQUE KEY unique_alumno_mesa (usuario_id, mesa_id)
+) ENGINE=InnoDB;
+ 
 CREATE TABLE Estado_Academico (
     id INT AUTO_INCREMENT PRIMARY KEY,
     usuario_id INT NOT NULL,
@@ -281,30 +235,23 @@ CREATE TABLE Estado_Academico (
     CONSTRAINT fk_estado_materia FOREIGN KEY (materia_codigo) REFERENCES Materia(codigo) ON DELETE CASCADE,
     UNIQUE KEY unique_estudiante_materia (usuario_id, materia_codigo)
 ) ENGINE=InnoDB;
-
+ 
 CREATE TABLE Inscripcion_Parcial (
-	id INT AUTO_INCREMENT NOT NULL PRIMARY KEY,
-	usuario_id INT NOT NULL,
-	anuncio_id INT NOT NULL,
+    id INT AUTO_INCREMENT NOT NULL PRIMARY KEY,
+    usuario_id INT NOT NULL,
+    anuncio_id INT NOT NULL,
     fecha_inscripcion DATETIME DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_ip_usuario FOREIGN KEY (usuario_id) REFERENCES student(usuario_id) ON DELETE CASCADE,
-    CONSTRAINT fk_ip_anuncio FOREIGN KEY (anuncio_id) REFERENCES anuncio(id) ON DELETE CASCADE,
+    CONSTRAINT fk_ip_anuncio FOREIGN KEY (anuncio_id) REFERENCES Anuncio(id) ON DELETE CASCADE,
     UNIQUE KEY unique_estudiante_parcial (usuario_id, anuncio_id)
 ) ENGINE=InnoDB;
-
->>>>>>> luka
+ 
 INSERT IGNORE INTO users (dni, nombre, apellido, nombre_usuario, password, nivel_acceso) 
 VALUES (
     '00000000', 
     'Administrador', 
     'Sistema', 
     'admin', 
-<<<<<<< HEAD
-    '$2a$10$vI8tmZH.RYv4uV9tf.X8su6U2S0.M.G8Y.199321.123', -- Esta es la clave 'admin' hasheada (reemplazala por el hash real que tengas en tu BD)
-    'ADMIN'
-);
-=======
     '$2a$10$tzGyrad6vMs9/BPymyxxv.JdZ8KEaDipWPuj1UqE1U6KuzRbDciy6',
     'ADMIN'
 );
->>>>>>> luka

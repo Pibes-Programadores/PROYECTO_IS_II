@@ -1,12 +1,4 @@
 /home/luka/Documentos/PROGRAMAS/PROYECTO_IS_II/Proyecto_IS_II/src/main/java/com/is1/proyecto/models/Student.java
-<<<<<<< HEAD
-/home/luka/Documentos/PROGRAMAS/PROYECTO_IS_II/Proyecto_IS_II/src/main/java/com/is1/proyecto/models/Sesion.java
-/home/luka/Documentos/PROGRAMAS/PROYECTO_IS_II/Proyecto_IS_II/src/main/java/com/is1/proyecto/models/Teacher.java
-/home/luka/Documentos/PROGRAMAS/PROYECTO_IS_II/Proyecto_IS_II/src/main/java/com/is1/proyecto/App.java
-/home/luka/Documentos/PROGRAMAS/PROYECTO_IS_II/Proyecto_IS_II/src/main/java/com/is1/proyecto/config/DBConfigSingleton.java
-/home/luka/Documentos/PROGRAMAS/PROYECTO_IS_II/Proyecto_IS_II/src/main/java/com/is1/proyecto/models/User.java
-/home/luka/Documentos/PROGRAMAS/PROYECTO_IS_II/Proyecto_IS_II/src/main/java/com/is1/proyecto/models/GestorSistema.java
-=======
 /home/luka/Documentos/PROGRAMAS/PROYECTO_IS_II/Proyecto_IS_II/src/main/java/com/is1/proyecto/models/DocenteCarrera.java
 /home/luka/Documentos/PROGRAMAS/PROYECTO_IS_II/Proyecto_IS_II/src/main/java/com/is1/proyecto/models/Correlatividad.java
 /home/luka/Documentos/PROGRAMAS/PROYECTO_IS_II/Proyecto_IS_II/src/main/java/com/is1/proyecto/models/Materia.java
@@ -26,5 +18,4 @@
 /home/luka/Documentos/PROGRAMAS/PROYECTO_IS_II/Proyecto_IS_II/src/main/java/com/is1/proyecto/models/GestorSistema.java
 /home/luka/Documentos/PROGRAMAS/PROYECTO_IS_II/Proyecto_IS_II/src/main/java/com/is1/proyecto/models/EstadoAcademico.java
 /home/luka/Documentos/PROGRAMAS/PROYECTO_IS_II/Proyecto_IS_II/src/main/java/com/is1/proyecto/models/AulaAsignacion.java
->>>>>>> luka
 /home/luka/Documentos/PROGRAMAS/PROYECTO_IS_II/Proyecto_IS_II/src/main/java/com/is1/proyecto/models/SecretariaAcademica.java
