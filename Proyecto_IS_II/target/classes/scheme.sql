@@ -1,14 +1,3 @@
-<<<<<<< HEAD
-DROP TABLE IF EXISTS sesion;
-DROP TABLE IF EXISTS student;
-DROP TABLE IF EXISTS teacher;
-DROP TABLE IF EXISTS secretariaAcademica;
-DROP TABLE IF EXISTS gestorSistema;
-DROP TABLE IF EXISTS users;
-
--- Creación de la Tabla Base: Usuario
--- Usamos ENUM para Nivel_Acceso como pide el catálogo.
-=======
 SET FOREIGN_KEY_CHECKS = 0;
 USE proyecto_is_ii;
 DROP TABLE IF EXISTS sesion;
@@ -35,7 +24,6 @@ DROP TABLE IF EXISTS mesas_examen;
 DROP TABLE IF EXISTS Estado_Academico;
 
 -- Creación de la Tabla Base: Usuario
->>>>>>> luka
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     dni VARCHAR(20) NOT NULL UNIQUE,
@@ -49,22 +37,11 @@ CREATE TABLE users (
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
-<<<<<<< HEAD
-
 -- Tabla Estudiante
--- Relación 1:1 con Usuario. El id del estudiante es el mismo id del usuario.
-=======
--- Tabla Estudiante
->>>>>>> luka
 CREATE TABLE student (
     usuario_id INT PRIMARY KEY,
     legajo VARCHAR(20) NOT NULL UNIQUE,
     tipo_estudiante ENUM('REGULAR', 'VOCACIONAL', 'INTERCAMBIO') NOT NULL,
-<<<<<<< HEAD
-    CONSTRAINT fk_estudiante_usuario 
-        FOREIGN KEY (usuario_id) REFERENCES users(id) 
-        ON DELETE CASCADE
-=======
     plan_estudio_id INT NOT NULL,
     CONSTRAINT fk_estudiante_usuario 
         FOREIGN KEY (usuario_id) REFERENCES users(id) 
@@ -72,28 +49,13 @@ CREATE TABLE student (
     CONSTRAINT fk_estudiante_plan
         FOREIGN KEY (plan_estudio_id) REFERENCES Plan_Estudio(id)
         ON DELETE RESTRICT
->>>>>>> luka
 ) ENGINE=InnoDB;
 
 -- Tabla Docente
 CREATE TABLE teacher (
     usuario_id INT PRIMARY KEY,
-<<<<<<< HEAD
-    cuil VARCHAR(20) NOT NULL UNIQUE,
-    titulo VARCHAR(100),
-    CONSTRAINT fk_docente_usuario 
-        FOREIGN KEY (usuario_id) REFERENCES users(id) 
-        ON DELETE CASCADE
-) ENGINE=InnoDB;
-
-CREATE TABLE teacher (
-    usuario_id INT PRIMARY KEY,
-    legajo_docente VARCHAR(50) NOT NULL UNIQUE,
-    cuil VARCHAR(20) NOT NULL UNIQUE, -- Agregado nuevamente
-=======
     legajo_docente VARCHAR(50) NOT NULL UNIQUE,
     cuil VARCHAR(20) NOT NULL UNIQUE,
->>>>>>> luka
     email VARCHAR(150) NOT NULL UNIQUE,
     especialidad VARCHAR(150),
     CONSTRAINT fk_teacher_user FOREIGN KEY (usuario_id) REFERENCES users(id) ON DELETE CASCADE
@@ -119,10 +81,6 @@ CREATE TABLE gestorSistema (
 ) ENGINE=InnoDB;
 
 -- Tabla Sesion
-<<<<<<< HEAD
--- Implementa ON DELETE CASCADE para que si se borra el usuario, se borren sus sesiones.
-=======
->>>>>>> luka
 CREATE TABLE sesion (
     id INT AUTO_INCREMENT PRIMARY KEY,
     usuario_id INT NOT NULL,
@@ -132,9 +90,6 @@ CREATE TABLE sesion (
     CONSTRAINT fk_sesion_usuario 
         FOREIGN KEY (usuario_id) REFERENCES users(id) 
         ON DELETE CASCADE
-<<<<<<< HEAD
-) ENGINE=InnoDB;
-=======
 ) ENGINE=InnoDB;
 
 CREATE TABLE Carrera (
@@ -300,4 +255,3 @@ VALUES (
     '$2a$10$tzGyrad6vMs9/BPymyxxv.JdZ8KEaDipWPuj1UqE1U6KuzRbDciy6',
     'ADMIN'
 );
->>>>>>> luka
