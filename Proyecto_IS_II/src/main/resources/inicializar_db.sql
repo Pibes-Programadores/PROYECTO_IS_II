@@ -100,5 +100,5 @@ INSERT INTO Estado_Academico (usuario_id, materia_codigo, estado) VALUES
 
 -- Inscribir en primer parcial DB
 INSERT INTO Inscripcion_Parcial (usuario_id, anuncio_id) VALUES
-(2, 2),
-(3, 2);
+(2, 1),
+(3, 1);

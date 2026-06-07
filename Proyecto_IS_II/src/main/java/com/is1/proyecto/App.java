@@ -1477,6 +1477,34 @@ get("/docente/materia/:materiaId", (req, res) -> {
     }
     model.put("anuncios", anuncios);
 
+     // Anuncios del período con contador de inscriptos a parciales
+    List<Map<String, Object>> anunciosConConteo = new ArrayList<>();
+    if (periodo != null) {
+        List<Map> anunciosDB = Base.findAll(
+            "SELECT id, tipo, titulo, contenido, fecha_examen FROM Anuncio WHERE materia_periodo_id = ? ORDER BY fecha_creacion DESC",
+            periodo.getId()
+        );
+        for (Map a : anunciosDB) {
+            Map<String, Object> anuncioMap = new HashMap<>();
+            anuncioMap.put("id",          a.get("id"));
+            anuncioMap.put("tipo",        a.get("tipo"));
+            anuncioMap.put("titulo",      a.get("titulo"));
+            anuncioMap.put("contenido",   a.get("contenido"));
+            anuncioMap.put("fechaExamen", a.get("fecha_examen"));
+            anuncioMap.put("esExamen",    "EXAMEN".equals(a.get("tipo")));
+            if ("EXAMEN".equals(a.get("tipo"))) {
+                List<Map> conteoRows = Base.findAll(
+                    "SELECT COUNT(*) AS total FROM Inscripcion_Parcial WHERE anuncio_id = ?",
+                    ((Number) a.get("id")).intValue()
+                );
+                int total = conteoRows.isEmpty() ? 0 : ((Number) conteoRows.get(0).get("total")).intValue();
+                anuncioMap.put("inscriptosCount", total);
+            }
+            anunciosConConteo.add(anuncioMap);
+        }
+    }
+    model.put("anuncios", anunciosConConteo);
+
     String successMessage = req.queryParams("message");
     String errorMessage   = req.queryParams("error");
     if (successMessage != null && !successMessage.isEmpty()) model.put("successMessage", successMessage);
@@ -1582,6 +1610,9 @@ post("/docente/materia/:materiaId/nota", (req, res) -> {
     String estadoCursada = req.queryParams("estado_cursada");
     if (estadoCursada == null || estadoCursada.isEmpty()) estadoCursada = "REGULAR";
 
+        String estadoCursada = req.queryParams("estado_cursada");
+    if (estadoCursada == null || estadoCursada.isEmpty()) estadoCursada = "REGULAR";
+
     try {
         int    studentId = Integer.parseInt(studentIdParam);
         double valor     = Double.parseDouble(valorParam);
@@ -1607,20 +1638,20 @@ post("/docente/materia/:materiaId/nota", (req, res) -> {
         nota.set("instancia",          "CURSADA");
         nota.saveIt();
 
-        // si promociona, lo guarda como aprobado
+        // Actualizar Estado_Academico: si PROMOCION, guardar como APROBADO en el motor de correlatividades
         String estadoFinal = "PROMOCION".equals(estadoCursada) ? "PROMOCION" : estadoCursada;
         Base.exec(
-                "INSERT INTO Estado_Academico (usuario_id, materia_codigo, estado) VALUES (?, ?, ?) " +
-                        "ON DUPLICATE KEY UPDATE estado = VALUES(estado)",
-                studentId, materiaId, estadoFinal
+            "INSERT INTO Estado_Academico (usuario_id, materia_codigo, estado) VALUES (?, ?, ?) " +
+            "ON DUPLICATE KEY UPDATE estado = VALUES(estado)",
+            studentId, materiaId, estadoFinal
         );
 
         res.redirect("/docente/materia/" + materiaId + "?message=" + URLEncoder.encode(
-                "Nota y estado de cursada registrados correctamente.", StandardCharsets.UTF_8.toString()));
+            "Nota y estado de cursada registrados correctamente.", StandardCharsets.UTF_8.toString()));
     } catch (Exception e) {
         e.printStackTrace();
         res.redirect("/docente/materia/" + materiaId + "?error=" + URLEncoder.encode(
-                "Error al registrar la nota: " + e.getMessage(), StandardCharsets.UTF_8.toString()));
+            "Error al registrar la nota: " + e.getMessage(), StandardCharsets.UTF_8.toString()));
     }
     return "";
 });
@@ -2159,18 +2190,335 @@ get("/docente/materia/:materiaId/contenido", (req, res) -> {
                 }
             }
 
-            // 3. Persistir la inscripción en la base de datos
-            try {
-                Base.exec(
-                    "INSERT INTO Inscripcion_Examen (usuario_id, mesa_id) VALUES (?, ?)",
-                    alumnoId, mesaId
-                );
-                res.redirect("/estudiante/inscripcion/examen?success=Te+has+inscripto+a+la+mesa+con+exito");
-            } catch (Exception e) {
-                res.redirect("/estudiante/inscripcion/examen?error=Ya+te+encuentras+inscripto+en+esta+mesa+de+examen");
+                    // 3. Persistir la inscripción en la base de datos
+        try {
+            Base.exec(
+                "INSERT INTO Inscripcion_Examen (usuario_id, mesa_id) VALUES (?, ?)",
+                alumnoId, mesaId
+            );
+            res.redirect("/estudiante/inscripcion/examen?success=Te+has+inscripto+a+la+mesa+con+exito");
+        } catch (Exception e) {
+            res.redirect("/estudiante/inscripcion/examen?error=Ya+te+encuentras+inscripto+en+esta+mesa+de+examen");
+        }
+
+        return null;
+        });
+
+        // ==========================================
+        // AULA VIRTUAL DEL ESTUDIANTE
+        // ==========================================
+
+        // GET /estudiante/aula-virtual — muestra materias cursando y sus anuncios
+        get("/estudiante/aula-virtual", (req, res) -> {
+            String username = req.session().attribute("currentUserUsername");
+            String role     = req.session().attribute("userRole");
+            if (username == null || !"ESTUDIANTE".equals(role)) {
+                res.redirect("/login");
+                return null;
             }
 
+            List<Map> studentRows = Base.findAll(
+                "SELECT s.usuario_id FROM student s JOIN users u ON u.id = s.usuario_id WHERE u.nombre_usuario = ?",
+                username
+            );
+            if (studentRows.isEmpty()) { res.redirect("/dashboard"); return null; }
+            int alumnoId = ((Number) studentRows.get(0).get("usuario_id")).intValue();
+
+            // Materias en las que el alumno está INSCRIPTO (cursando)
+            List<Map> materiasInscriptas = Base.findAll(
+                "SELECT ea.materia_codigo, m.nombre FROM Estado_Academico ea " +
+                "JOIN Materia m ON m.codigo = ea.materia_codigo " +
+                "WHERE ea.usuario_id = ? AND ea.estado = 'INSCRIPTO'",
+                alumnoId
+            );
+
+            List<Map<String, Object>> materiasConAnuncios = new ArrayList<>();
+            for (Map mat : materiasInscriptas) {
+                int codigo = ((Number) mat.get("materia_codigo")).intValue();
+
+                // Buscar el período vigente de esta materia
+                List<Map> periodoRows = Base.findAll(
+                    "SELECT id FROM Materia_Periodo WHERE materia_codigo = ? LIMIT 1", codigo
+                );
+                if (periodoRows.isEmpty()) continue;
+                int periodoId = ((Number) periodoRows.get(0).get("id")).intValue();
+
+                // Anuncios del período
+                List<Map> anunciosDB = Base.findAll(
+                    "SELECT a.id, a.tipo, a.titulo, a.contenido, a.fecha_examen " +
+                    "FROM Anuncio a WHERE a.materia_periodo_id = ? ORDER BY a.fecha_creacion DESC",
+                    periodoId
+                );
+
+                List<Map<String, Object>> anunciosList = new ArrayList<>();
+                for (Map a : anunciosDB) {
+                    Map<String, Object> anuncioMap = new HashMap<>();
+                    anuncioMap.put("id",          a.get("id"));
+                    anuncioMap.put("tipo",         a.get("tipo"));
+                    anuncioMap.put("titulo",       a.get("titulo"));
+                    anuncioMap.put("contenido",    a.get("contenido"));
+                    anuncioMap.put("fechaExamen",  a.get("fecha_examen"));
+                    anuncioMap.put("esExamen",     "EXAMEN".equals(a.get("tipo")));
+
+                    // Verificar si el alumno ya se inscribió a este parcial
+                    if ("EXAMEN".equals(a.get("tipo"))) {
+                        int anuncioId = ((Number) a.get("id")).intValue();
+                        List<Map> yaInscripto = Base.findAll(
+                            "SELECT id FROM Inscripcion_Parcial WHERE usuario_id = ? AND anuncio_id = ?",
+                            alumnoId, anuncioId
+                        );
+                        anuncioMap.put("yaInscripto", !yaInscripto.isEmpty());
+                    }
+                    anunciosList.add(anuncioMap);
+                }
+
+                Map<String, Object> materiaMap = new HashMap<>();
+                materiaMap.put("codigo",    codigo);
+                materiaMap.put("nombre",    mat.get("nombre"));
+                materiaMap.put("anuncios",  anunciosList);
+                materiasConAnuncios.add(materiaMap);
+            }
+
+            Map<String, Object> model = new HashMap<>();
+            model.put("materias", materiasConAnuncios);
+            String success = req.queryParams("success");
+            String error   = req.queryParams("error");
+            if (success != null) model.put("successMessage", success);
+            if (error   != null) model.put("errorMessage",   error);
+
+            return new ModelAndView(model, "aula_virtual.mustache");
+        }, new MustacheTemplateEngine());
+
+        // POST /estudiante/inscripcion-parcial — confirma asistencia a un parcial
+        post("/estudiante/inscripcion-parcial", (req, res) -> {
+            String username = req.session().attribute("currentUserUsername");
+            String role     = req.session().attribute("userRole");
+            if (username == null || !"ESTUDIANTE".equals(role)) {
+                res.status(403);
+                return "No autorizado";
+            }
+
+            List<Map> studentRows = Base.findAll(
+                "SELECT s.usuario_id FROM student s JOIN users u ON u.id = s.usuario_id WHERE u.nombre_usuario = ?",
+                username
+            );
+            if (studentRows.isEmpty()) { res.redirect("/dashboard"); return null; }
+            int alumnoId  = ((Number) studentRows.get(0).get("usuario_id")).intValue();
+            String anuncioIdStr = req.queryParams("anuncio_id");
+
+            if (anuncioIdStr == null || anuncioIdStr.isEmpty()) {
+                res.redirect("/estudiante/aula-virtual?error=" +
+                    URLEncoder.encode("Parcial no especificado.", StandardCharsets.UTF_8.toString()));
+                return null;
+            }
+
+            try {
+                int anuncioId = Integer.parseInt(anuncioIdStr);
+                // Verificar que el anuncio sea de tipo EXAMEN
+                List<Map> anuncioRows = Base.findAll(
+                    "SELECT tipo FROM Anuncio WHERE id = ?", anuncioId
+                );
+                if (anuncioRows.isEmpty() || !"EXAMEN".equals(anuncioRows.get(0).get("tipo"))) {
+                    res.redirect("/estudiante/aula-virtual?error=" +
+                        URLEncoder.encode("El anuncio no corresponde a un parcial.", StandardCharsets.UTF_8.toString()));
+                    return null;
+                }
+                Base.exec(
+                    "INSERT INTO Inscripcion_Parcial (usuario_id, anuncio_id) VALUES (?, ?)",
+                    alumnoId, anuncioId
+                );
+                res.redirect("/estudiante/aula-virtual?success=" +
+                    URLEncoder.encode("Asistencia confirmada al parcial.", StandardCharsets.UTF_8.toString()));
+            } catch (Exception e) {
+                res.redirect("/estudiante/aula-virtual?error=" +
+                    URLEncoder.encode("Ya confirmaste asistencia a este parcial.", StandardCharsets.UTF_8.toString()));
+            }
             return null;
         });
+
+        // ==========================================
+        // CARGA DE ACTAS DE FINALES (DOCENTE)
+        // ==========================================
+
+        // GET /docente/notas-finales — lista las mesas de examen del docente
+        get("/docente/notas-finales", (req, res) -> {
+            String role = req.session().attribute("userRole");
+            if (role == null || !"DOCENTE".equals(role)) {
+                res.redirect("/dashboard");
+                return null;
+            }
+            Integer userId  = req.session().attribute("userId");
+            Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
+            if (teacher == null) { res.redirect("/dashboard"); return null; }
+            int teacherId = teacher.getInteger("usuario_id");
+
+            // Mesas de materias que el docente tiene asignadas
+            List<Map> mesas = Base.findAll(
+                "SELECT me.id, me.fecha, m.nombre AS nombreMateria, me.materia_codigo " +
+                "FROM mesas_examen me " +
+                "JOIN Materia m ON m.codigo = me.materia_codigo " +
+                "JOIN Docente_Materia dm ON dm.materia_id = me.materia_codigo " +
+                "WHERE dm.teacher_id = ? " +
+                "ORDER BY me.fecha DESC",
+                teacherId
+            );
+
+            List<Map<String, Object>> mesasList = new ArrayList<>();
+            for (Map m : mesas) {
+                Map<String, Object> mm = new HashMap<>();
+                mm.put("id",             ((Number) m.get("id")).intValue());
+                mm.put("fecha",          m.get("fecha"));
+                mm.put("nombreMateria",  m.get("nombreMateria"));
+                mm.put("materiaCodigo",  m.get("materia_codigo"));
+                mesasList.add(mm);
+            }
+
+            Map<String, Object> model = new HashMap<>();
+            model.put("mesas", mesasList);
+            String success = req.queryParams("success");
+            String error   = req.queryParams("error");
+            if (success != null) model.put("successMessage", success);
+            if (error   != null) model.put("errorMessage",   error);
+
+            return new ModelAndView(model, "carga_finales.mustache");
+        }, new MustacheTemplateEngine());
+
+        // GET /docente/notas-finales/:mesaId — muestra inscriptos a esa mesa
+        get("/docente/notas-finales/:mesaId", (req, res) -> {
+            String role = req.session().attribute("userRole");
+            if (role == null || !"DOCENTE".equals(role)) {
+                res.redirect("/dashboard");
+                return null;
+            }
+            Integer userId  = req.session().attribute("userId");
+            Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
+            if (teacher == null) { res.redirect("/dashboard"); return null; }
+            int teacherId = teacher.getInteger("usuario_id");
+            int mesaId    = Integer.parseInt(req.params("mesaId"));
+
+            // Verificar que la mesa pertenezca a una materia del docente
+            List<Map> mesaRows = Base.findAll(
+                "SELECT me.id, me.fecha, me.materia_codigo, m.nombre AS nombreMateria " +
+                "FROM mesas_examen me JOIN Materia m ON m.codigo = me.materia_codigo " +
+                "JOIN Docente_Materia dm ON dm.materia_id = me.materia_codigo " +
+                "WHERE me.id = ? AND dm.teacher_id = ?",
+                mesaId, teacherId
+            );
+            if (mesaRows.isEmpty()) {
+                res.redirect("/docente/notas-finales?error=" +
+                    URLEncoder.encode("No tenés acceso a esa mesa.", StandardCharsets.UTF_8.toString()));
+                return null;
+            }
+            Map mesa = mesaRows.get(0);
+
+            // Solo los inscriptos a esta mesa específica
+            List<Map> inscriptosDB = Base.findAll(
+                "SELECT ie.usuario_id, u.nombre, u.apellido, s.legajo " +
+                "FROM inscripciones_examen ie " +
+                "JOIN users u ON u.id = ie.usuario_id " +
+                "JOIN student s ON s.usuario_id = ie.usuario_id " +
+                "WHERE ie.mesa_id = ? " +
+                "ORDER BY u.apellido ASC",
+                mesaId
+            );
+
+            List<Map<String, Object>> inscriptosList = new ArrayList<>();
+            for (Map i : inscriptosDB) {
+                Map<String, Object> im = new HashMap<>();
+                im.put("usuarioId", ((Number) i.get("usuario_id")).intValue());
+                im.put("nombre",    i.get("nombre") + " " + i.get("apellido"));
+                im.put("legajo",    i.get("legajo"));
+                inscriptosList.add(im);
+            }
+
+            Map<String, Object> model = new HashMap<>();
+            model.put("mesaId",        mesaId);
+            model.put("fecha",         mesa.get("fecha"));
+            model.put("nombreMateria", mesa.get("nombreMateria"));
+            model.put("materiaCodigo", mesa.get("materia_codigo"));
+            model.put("inscriptos",    inscriptosList);
+            String success = req.queryParams("success");
+            String error   = req.queryParams("error");
+            if (success != null) model.put("successMessage", success);
+            if (error   != null) model.put("errorMessage",   error);
+
+            return new ModelAndView(model, "carga_finales_acta.mustache");
+        }, new MustacheTemplateEngine());
+
+        // POST /docente/notas-finales/:mesaId — guarda calificación del final
+        post("/docente/notas-finales/:mesaId", (req, res) -> {
+            String role = req.session().attribute("userRole");
+            if (role == null || !"DOCENTE".equals(role)) {
+                res.redirect("/dashboard");
+                return null;
+            }
+            Integer userId  = req.session().attribute("userId");
+            Teacher teacher = Teacher.findFirst("usuario_id = ?", userId);
+            if (teacher == null) { res.redirect("/dashboard"); return null; }
+            int teacherId  = teacher.getInteger("usuario_id");
+            int mesaId     = Integer.parseInt(req.params("mesaId"));
+
+            String studentIdStr = req.queryParams("student_id");
+            String valorStr     = req.queryParams("valor");
+
+            if (studentIdStr == null || valorStr == null || studentIdStr.isEmpty() || valorStr.isEmpty()) {
+                res.redirect("/docente/notas-finales/" + mesaId + "?error=" +
+                    URLEncoder.encode("Datos incompletos.", StandardCharsets.UTF_8.toString()));
+                return null;
+            }
+
+            try {
+                int    studentId = Integer.parseInt(studentIdStr);
+                double valor     = Double.parseDouble(valorStr);
+
+                if (valor < 0 || valor > 10) throw new IllegalArgumentException("Nota fuera de rango.");
+
+                // Obtener el período de la materia desde la mesa
+                List<Map> mesaRows = Base.findAll(
+                    "SELECT me.materia_codigo FROM mesas_examen me " +
+                    "JOIN Docente_Materia dm ON dm.materia_id = me.materia_codigo " +
+                    "WHERE me.id = ? AND dm.teacher_id = ?",
+                    mesaId, teacherId
+                );
+                if (mesaRows.isEmpty()) throw new IllegalStateException("Mesa no autorizada.");
+                int materiaCodigo = ((Number) mesaRows.get(0).get("materia_codigo")).intValue();
+
+                List<Map> periodoRows = Base.findAll(
+                    "SELECT id FROM Materia_Periodo WHERE materia_codigo = ? LIMIT 1", materiaCodigo
+                );
+                if (periodoRows.isEmpty()) throw new IllegalStateException("No hay período activo.");
+                int periodoId = ((Number) periodoRows.get(0).get("id")).intValue();
+
+                // Guardar la nota con instancia FINAL
+                Nota nota = new Nota();
+                nota.set("materia_periodo_id", periodoId);
+                nota.set("student_id",         studentId);
+                nota.set("teacher_id",         teacherId);
+                nota.set("valor",              valor);
+                nota.set("instancia",          "FINAL");
+                nota.saveIt();
+
+                // Determinar nuevo estado: aprueba con >= 4
+                String nuevoEstado = (valor >= 4.0) ? "APROBADO" : "REGULAR";
+
+                Base.exec(
+                    "INSERT INTO Estado_Academico (usuario_id, materia_codigo, estado) VALUES (?, ?, ?) " +
+                    "ON DUPLICATE KEY UPDATE estado = VALUES(estado)",
+                    studentId, materiaCodigo, nuevoEstado
+                );
+
+                res.redirect("/docente/notas-finales/" + mesaId + "?success=" +
+                    URLEncoder.encode("Calificación registrada.", StandardCharsets.UTF_8.toString()));
+            } catch (Exception e) {
+                e.printStackTrace();
+                res.redirect("/docente/notas-finales/" + mesaId + "?error=" +
+                    URLEncoder.encode("Error: " + e.getMessage(), StandardCharsets.UTF_8.toString()));
+            }
+            return null;
+        });
+
+        // Actualizar filtro de inscripción a exámenes para excluir PROMOCION y APROBADO
+        // (el GET /estudiante/inscripcion/examen ya filtra correctamente: solo REGULAR o LIBRE pasan)
+
     } 
-} 
+}

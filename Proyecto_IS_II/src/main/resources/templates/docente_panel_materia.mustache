@@ -78,13 +78,22 @@
                         {{/alumnos}}
                     </select>
                 </div>
-                <div>
-                    <label class="block text-[#ccd0fc] text-sm font-medium mb-1">Nota (0.00 — 10.00):</label>
-                    <input type="number" name="valor" min="0" max="10" step="0.01" required
-                           class="w-full px-4 py-2 border rounded-md text-gray-900 focus:ring-2 focus:ring-green-500"
-                           placeholder="Ej: 7.50">
-                </div>
-                <button type="submit"
+                            <div>
+                <label class="block text-[#ccd0fc] text-sm font-medium mb-1">Nota (0.00 — 10.00):</label>
+                <input type="number" name="valor" min="0" max="10" step="0.01" required
+                       class="w-full px-4 py-2 border rounded-md text-gray-900 focus:ring-2 focus:ring-green-500"
+                       placeholder="Ej: 7.50">
+            </div>
+            <div>
+                <label class="block text-[#ccd0fc] text-sm font-medium mb-1">Estado de Cursada:</label>
+                <select name="estado_cursada" required
+                        class="w-full px-4 py-2 border rounded-md bg-white text-gray-900 focus:ring-2 focus:ring-green-500">
+                    <option value="REGULAR">Regular</option>
+                    <option value="LIBRE">Libre</option>
+                    <option value="PROMOCION">Promoción (exime de final)</option>
+                </select>
+            </div>
+            <button type="submit"
                         class="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition duration-300 font-medium">
                     Registrar Nota
                 </button>
@@ -96,7 +105,33 @@
             </p>
             {{/hayAlumnos}}
         </div>
-
+                <!-- SECCIÓN ANUNCIOS PUBLICADOS -->
+        {{#anuncios}}
+        <div class="bg-[#190019]/60 border border-yellow-700/20 rounded-lg p-6 shadow-lg">
+            <h2 class="text-xl font-bold text-yellow-300 mb-4">📋 Anuncios Publicados</h2>
+            <div class="space-y-3">
+                {{#anuncios}}
+                <div class="bg-white/10 rounded-md p-4">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="text-xs font-mono uppercase text-yellow-400">{{tipo}}</span>
+                            <p class="text-white font-semibold">{{titulo}}</p>
+                            <p class="text-[#ccd0fc] text-sm">{{contenido}}</p>
+                            {{#fechaExamen}}<p class="text-yellow-300 text-xs mt-1">📅 Fecha: {{fechaExamen}}</p>{{/fechaExamen}}
+                        </div>
+                        {{#esExamen}}
+                        <div class="text-right ml-4">
+                            <span class="inline-block bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+                                {{inscriptosCount}} inscripto(s)
+                            </span>
+                        </div>
+                        {{/esExamen}}
+                    </div>
+                </div>
+                {{/anuncios}}
+            </div>
+        </div>
+        {{/anuncios}}
         <!-- SECCIÓN 3: Asignar Aula -->
         <div class="bg-[#190019]/60 border border-blue-700/40 rounded-lg p-6 shadow-lg">
             <h2 class="text-2xl font-bold text-blue-400 mb-4">🏫 Asignar Aula</h2>
@@ -124,9 +159,16 @@
             </a>
         </div>
 
-        <!-- Navegación -->
-        <div class="text-center pb-6">
-            <a href="/docente/materias" class="text-purple-300 hover:underline text-sm">← Volver a mis materias</a>
+                <!-- Navegación -->
+        <div class="text-center pb-6 space-y-2">
+            <div>
+                <a href="/docente/notas-finales" class="inline-block bg-indigo-600 text-white py-2 px-6 rounded-md hover:bg-indigo-700 transition duration-300 font-medium text-sm">
+                    📋 Ir a Carga de Actas de Finales
+                </a>
+            </div>
+            <div>
+                <a href="/docente/materias" class="text-purple-300 hover:underline text-sm">← Volver a Mis Materias</a>
+            </div>
         </div>
     </div>
 
