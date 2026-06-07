@@ -4,13 +4,13 @@ com/is1/proyecto/models/Materia.class
 com/is1/proyecto/models/User.class
 com/is1/proyecto/models/Nota.class
 com/is1/proyecto/models/Student.class
-com/is1/proyecto/models/EstadoAcademico.class
 com/is1/proyecto/config/DBConfigSingleton.class
+com/is1/proyecto/models/EstadoAcademico.class
 com/is1/proyecto/models/MesaExamen.class
 com/is1/proyecto/models/Teacher.class
 com/is1/proyecto/models/DocenteCarrera.class
-com/is1/proyecto/models/PlanEstudio.class
 com/is1/proyecto/models/GestorSistema.class
+com/is1/proyecto/models/PlanEstudio.class
 com/is1/proyecto/models/SecretariaAcademica.class
 com/is1/proyecto/models/Carrera.class
 com/is1/proyecto/models/AulaAsignacion.class

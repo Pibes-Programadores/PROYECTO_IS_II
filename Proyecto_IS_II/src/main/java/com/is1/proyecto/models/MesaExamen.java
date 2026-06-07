@@ -3,7 +3,7 @@ package com.is1.proyecto.models;
 import org.javalite.activejdbc.Model;
 import org.javalite.activejdbc.annotations.Table;
 
-@Table("mesas_examen")
+@Table("Mesa_Examen")
 public class MesaExamen extends Model {
 
     // Getter y Setter para la Materia Asociada (FK)

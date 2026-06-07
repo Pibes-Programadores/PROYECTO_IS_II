@@ -1,9 +1,10 @@
-SET FOREIGN_KEY_CHECKS = 0;
-USE proyecto_is_ii;
+DROP TABLE IF EXISTS Inscripcion_Examen;
+DROP TABLE IF EXISTS Mesa_Examen;
+DROP TABLE IF EXISTS Estado_Academico;
+DROP TABLE IF EXISTS Docente_Carrera;
 DROP TABLE IF EXISTS sesion;
 DROP TABLE IF EXISTS gestorSistema;
 DROP TABLE IF EXISTS secretariaAcademica;
-DROP TABLE IF EXISTS Docente_Carrera;
 DROP TABLE IF EXISTS teacher;
 DROP TABLE IF EXISTS Docente_Materia;
 DROP TABLE IF EXISTS student;
@@ -18,11 +19,10 @@ DROP TABLE IF EXISTS Correlatividad;
 DROP TABLE IF EXISTS Materia;
 DROP TABLE IF EXISTS Plan_Estudio;
 DROP TABLE IF EXISTS Carrera;
-DROP TABLE IF EXISTS inscripciones_examen;
-DROP TABLE IF EXISTS mesas_examen;
-DROP TABLE IF EXISTS Estado_Academico;
+
 
 -- Creación de la Tabla Base: Usuario
+-- Usamos ENUM para Nivel_Acceso como pide el catálogo.
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     dni VARCHAR(20) NOT NULL UNIQUE,
@@ -36,18 +36,16 @@ CREATE TABLE users (
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
+
 -- Tabla Estudiante
+-- Relación 1:1 con Usuario. El id del estudiante es el mismo id del usuario.
 CREATE TABLE student (
     usuario_id INT PRIMARY KEY,
     legajo VARCHAR(20) NOT NULL UNIQUE,
     tipo_estudiante ENUM('REGULAR', 'VOCACIONAL', 'INTERCAMBIO') NOT NULL,
-    plan_estudio_id INT NOT NULL,
     CONSTRAINT fk_estudiante_usuario 
         FOREIGN KEY (usuario_id) REFERENCES users(id) 
-        ON DELETE CASCADE,
-    CONSTRAINT fk_estudiante_plan
-        FOREIGN KEY (plan_estudio_id) REFERENCES Plan_Estudio(id)
-        ON DELETE RESTRICT
+        ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 -- Tabla Docente
@@ -80,6 +78,7 @@ CREATE TABLE gestorSistema (
 ) ENGINE=InnoDB;
 
 -- Tabla Sesion
+-- Implementa ON DELETE CASCADE para que si se borra el usuario, se borren sus sesiones.
 CREATE TABLE sesion (
     id INT AUTO_INCREMENT PRIMARY KEY,
     usuario_id INT NOT NULL,
@@ -128,8 +127,8 @@ CREATE TABLE Correlatividad (
     materia_codigo INT NOT NULL,
     materia_correlativa_codigo INT NOT NULL,
     condicion ENUM('REGULAR', 'APROBADA') NOT NULL DEFAULT 'APROBADA',
-    tipo_requisito ENUM('CURSAR', 'RENDIR') NOT NULL DEFAULT 'CURSAR',
-    PRIMARY KEY (materia_codigo, materia_correlativa_codigo, tipo_requisito),
+    tipo_requisito ENUM('CURSAR', 'RENDIR') NOT NULL DEFAULT 'CURSAR', -- <- Columna agregada
+    PRIMARY KEY (materia_codigo, materia_correlativa_codigo, tipo_requisito), -- <- PK actualizada
     CONSTRAINT fk_corr_materia FOREIGN KEY (materia_codigo) REFERENCES Materia(codigo) ON DELETE CASCADE,
     CONSTRAINT fk_corr_requisito FOREIGN KEY (materia_correlativa_codigo) REFERENCES Materia(codigo) ON DELETE CASCADE,
     CONSTRAINT chk_no_auto_correlativa CHECK (materia_codigo != materia_correlativa_codigo)
@@ -141,14 +140,6 @@ CREATE TABLE Materia_Periodo (
     anio_academico INT NOT NULL,
     tipo_cuatrimestre ENUM('PRIMER_CUATRIMESTRE', 'SEGUNDO_CUATRIMESTRE', 'ANUAL', 'VERANO') NOT NULL,
     CONSTRAINT fk_periodo_materia FOREIGN KEY (materia_codigo) REFERENCES Materia(codigo) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
-CREATE TABLE Docente_Carrera (
-    teacher_id INT NOT NULL,
-    carrera_id INT NOT NULL,
-    PRIMARY KEY (teacher_id, carrera_id),
-    CONSTRAINT fk_dc_teacher  FOREIGN KEY (teacher_id)  REFERENCES teacher(usuario_id)  ON DELETE CASCADE,
-    CONSTRAINT fk_dc_carrera  FOREIGN KEY (carrera_id)  REFERENCES Carrera(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE Aula (
@@ -170,6 +161,7 @@ CREATE TABLE SolicitudAula (
     CONSTRAINT fk_solicitud_materia FOREIGN KEY (materia_periodo_id) REFERENCES Materia_Periodo(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- Tabla Anuncio
 CREATE TABLE Anuncio (
     id INT AUTO_INCREMENT PRIMARY KEY,
     materia_periodo_id INT NOT NULL,
@@ -183,6 +175,7 @@ CREATE TABLE Anuncio (
     FOREIGN KEY (teacher_id) REFERENCES teacher(usuario_id) ON DELETE CASCADE
 )ENGINE=InnoDB;
 
+-- Tabla Nota
 CREATE TABLE Nota (
     id INT AUTO_INCREMENT PRIMARY KEY,
     materia_periodo_id INT NOT NULL,
@@ -190,12 +183,12 @@ CREATE TABLE Nota (
     teacher_id INT NOT NULL,
     valor DECIMAL(5,2) NOT NULL,
     fecha_carga DATETIME DEFAULT CURRENT_TIMESTAMP,
-    instancia ENUM('PARCIAL', 'CURSADA', 'FINAL') NOT NULL DEFAULT 'CURSADA',
     FOREIGN KEY (materia_periodo_id) REFERENCES Materia_Periodo(id) ON DELETE CASCADE,
     FOREIGN KEY (student_id) REFERENCES student(usuario_id) ON DELETE CASCADE,
     FOREIGN KEY (teacher_id) REFERENCES teacher(usuario_id) ON DELETE CASCADE
 )ENGINE=InnoDB;
 
+-- Tabla Aula_Asignacion
 CREATE TABLE Aula_Asignacion (
     id INT AUTO_INCREMENT PRIMARY KEY,
     materia_periodo_id INT NOT NULL,
@@ -206,51 +199,56 @@ CREATE TABLE Aula_Asignacion (
     FOREIGN KEY (teacher_id) REFERENCES teacher(usuario_id) ON DELETE CASCADE
 )ENGINE=InnoDB;
 
+-- Vincula un docente a una o más carreras.
+-- Necesaria para registrar docentes y para el buscador de asignación de materias.
+CREATE TABLE IF NOT EXISTS Docente_Carrera (
+    teacher_id INT NOT NULL,
+    carrera_id INT NOT NULL,
+    PRIMARY KEY (teacher_id, carrera_id),
+    CONSTRAINT fk_dc_teacher  FOREIGN KEY (teacher_id) REFERENCES teacher(usuario_id)  ON DELETE CASCADE,
+    CONSTRAINT fk_dc_carrera  FOREIGN KEY (carrera_id) REFERENCES Carrera(id)          ON DELETE CASCADE
+) ENGINE=InnoDB;
 
-CREATE TABLE IF NOT EXISTS mesas_examen (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+-- Estado académico de un alumno por materia.
+-- Estados: INSCRIPTO, REGULAR, LIBRE, APROBADO, PROMOCION
+CREATE TABLE IF NOT EXISTS Estado_Academico (
+    id            INT AUTO_INCREMENT PRIMARY KEY,
+    usuario_id    INT NOT NULL,
     materia_codigo INT NOT NULL,
-    fecha DATE NOT NULL,
+    estado        VARCHAR(20) NOT NULL,
+    UNIQUE KEY uq_alumno_materia (usuario_id, materia_codigo),
+    CONSTRAINT fk_ea_alumno   FOREIGN KEY (usuario_id)     REFERENCES student(usuario_id)  ON DELETE CASCADE,
+    CONSTRAINT fk_ea_materia  FOREIGN KEY (materia_codigo) REFERENCES Materia(codigo)       ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Mesa de examen final para una materia.
+CREATE TABLE IF NOT EXISTS Mesa_Examen (
+    id             INT AUTO_INCREMENT PRIMARY KEY,
+    materia_codigo INT NOT NULL,
+    fecha          DATE NOT NULL,
     CONSTRAINT fk_mesa_materia FOREIGN KEY (materia_codigo) REFERENCES Materia(codigo) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
-CREATE TABLE IF NOT EXISTS inscripciones_examen (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+-- Inscripción de un alumno a una mesa de examen.
+CREATE TABLE IF NOT EXISTS Inscripcion_Examen (
+    id         INT AUTO_INCREMENT PRIMARY KEY,
     usuario_id INT NOT NULL,
-    mesa_id INT NOT NULL,
-    fecha_inscripcion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_inscripcion_alumno FOREIGN KEY (usuario_id) REFERENCES student(usuario_id) ON DELETE CASCADE,
-    CONSTRAINT fk_inscripcion_mesa FOREIGN KEY (mesa_id) REFERENCES mesas_examen(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_alumno_mesa (usuario_id, mesa_id) -- Evita duplicados
-    ) ENGINE=InnoDB;
-
-CREATE TABLE Estado_Academico (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    usuario_id INT NOT NULL,
-    materia_codigo INT NOT NULL,
-    estado ENUM('INSCRIPTO', 'REGULAR', 'APROBADO', 'REPROBADO', 'LIBRE', 'PROMOCION') NOT NULL,
-    fecha_actualizacion DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_estado_estudiante FOREIGN KEY (usuario_id) REFERENCES student(usuario_id) ON DELETE CASCADE,
-    CONSTRAINT fk_estado_materia FOREIGN KEY (materia_codigo) REFERENCES Materia(codigo) ON DELETE CASCADE,
-    UNIQUE KEY unique_estudiante_materia (usuario_id, materia_codigo)
+    mesa_id    INT NOT NULL,
+    UNIQUE KEY uq_alumno_mesa (usuario_id, mesa_id),
+    CONSTRAINT fk_ie_alumno FOREIGN KEY (usuario_id) REFERENCES student(usuario_id) ON DELETE CASCADE,
+    CONSTRAINT fk_ie_mesa   FOREIGN KEY (mesa_id)    REFERENCES Mesa_Examen(id)      ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
-CREATE TABLE Inscripcion_Parcial (
-	id INT AUTO_INCREMENT NOT NULL PRIMARY KEY,
-	usuario_id INT NOT NULL,
-	anuncio_id INT NOT NULL,
-    fecha_inscripcion DATETIME DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_ip_usuario FOREIGN KEY (usuario_id) REFERENCES student(usuario_id) ON DELETE CASCADE,
-    CONSTRAINT fk_ip_anuncio FOREIGN KEY (anuncio_id) REFERENCES anuncio(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_estudiante_parcial (usuario_id, anuncio_id)
-) ENGINE=InnoDB;
 
+
+-- SCRIPT DE INICIALIZACIÓN (SEED)
+-- Creamos el superusuario por defecto para todo el equipo
 INSERT IGNORE INTO users (dni, nombre, apellido, nombre_usuario, password, nivel_acceso) 
 VALUES (
     '00000000', 
     'Administrador', 
     'Sistema', 
     'admin', 
-    '$2a$10$tzGyrad6vMs9/BPymyxxv.JdZ8KEaDipWPuj1UqE1U6KuzRbDciy6',
+    '$2a$10$tzGyrad6vMs9/BPymyxxv.JdZ8KEaDipWPuj1UqE1U6KuzRbDciy6', -- Esta es la clave 'admin' hasheada (reemplazala por el hash real que tengas en tu BD)
     'ADMIN'
 );
