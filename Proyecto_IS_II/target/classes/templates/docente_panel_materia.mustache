@@ -66,6 +66,7 @@
         <!-- SECCIÓN 2: Cargar Notas -->
         <div class="bg-[#190019]/60 border border-green-700/40 rounded-lg p-6 shadow-lg">
             <h2 class="text-2xl font-bold text-green-400 mb-4">📝 Cargar Nota</h2>
+            {{#hayAlumnos}}
             <form action="/docente/materia/{{codigoMateria}}/nota" method="post" class="space-y-4">
                 <div>
                     <label class="block text-[#ccd0fc] text-sm font-medium mb-1">Alumno:</label>
@@ -88,6 +89,12 @@
                     Registrar Nota
                 </button>
             </form>
+            {{/hayAlumnos}}
+            {{^hayAlumnos}}
+            <p class="text-[#ccd0fc] text-sm bg-[#190019]/80 p-4 rounded-md border border-purple-500/30">
+                Actualmente no hay alumnos inscriptos en esta comisión.
+            </p>
+            {{/hayAlumnos}}
         </div>
 
         <!-- SECCIÓN 3: Asignar Aula -->

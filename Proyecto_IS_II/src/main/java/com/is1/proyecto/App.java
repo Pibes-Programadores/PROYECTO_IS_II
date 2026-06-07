@@ -1422,17 +1422,21 @@ get("/docente/materia/:materiaId", (req, res) -> {
         else if ("VERANO".equals(raw))                periodoLabel = "Verano";
     }
 
-    // Alumnos para el selector de notas (todos los students)
+    // Alumnos para el selector de notas (sólo inscriptos o regulares)
+    List<Map> inscriptosRows = Base.findAll(
+        "SELECT u.id as usuario_id, u.nombre, u.apellido, s.legajo " +
+        "FROM users u " +
+        "JOIN student s ON u.id = s.usuario_id " +
+        "JOIN Estado_Academico ea ON s.usuario_id = ea.usuario_id " +
+        "WHERE ea.materia_codigo = ? AND ea.estado IN ('INSCRIPTO', 'REGULAR')",
+        materiaId
+    );
+
     List<Map<String, Object>> alumnosOptions = new ArrayList<>();
-    for (Model studentRecord : Student.findAll()) {
-        Student student = (Student) studentRecord;
-        User   user     = student.getUser();
-        String label    = user != null
-            ? user.getString("apellido") + ", " + user.getString("nombre") +
-              " — " + student.getLegajo()
-            : "Alumno #" + student.getInteger("usuario_id");
+    for (Map row : inscriptosRows) {
+        String label = row.get("apellido") + ", " + row.get("nombre") + " — " + row.get("legajo");
         Map<String, Object> opt = new HashMap<>();
-        opt.put("id",    student.getInteger("usuario_id"));
+        opt.put("id", row.get("usuario_id"));
         opt.put("label", label);
         alumnosOptions.add(opt);
     }
@@ -1443,6 +1447,7 @@ get("/docente/materia/:materiaId", (req, res) -> {
     model.put("anioMateria",   materia.getInteger("anio_cursada"));
     model.put("periodoMateria", periodoLabel);
     model.put("alumnos",       alumnosOptions);
+    model.put("hayAlumnos",    !alumnosOptions.isEmpty());
 
 
     List<Map<String, Object>> anuncios = new ArrayList<>();
@@ -1582,6 +1587,16 @@ post("/docente/materia/:materiaId/nota", (req, res) -> {
         double valor     = Double.parseDouble(valorParam);
 
         if (valor < 0 || valor > 10) throw new IllegalArgumentException("La nota debe estar entre 0 y 10.");
+
+        // Validar que el alumno esté inscripto o regular en la materia
+        List<Map> estadoRows = Base.findAll(
+            "SELECT estado FROM Estado_Academico WHERE usuario_id = ? AND materia_codigo = ?",
+            studentId, materiaId
+        );
+        Map estadoRow = estadoRows.isEmpty() ? null : estadoRows.get(0);
+        if (estadoRow == null || (!"INSCRIPTO".equals(estadoRow.get("estado")) && !"REGULAR".equals(estadoRow.get("estado")))) {
+            throw new SecurityException("El alumno no está inscripto o no es válido para recibir nota en esta materia.");
+        }
 
         // Guardar la nota con instancia CURSADA
         Nota nota = new Nota();
