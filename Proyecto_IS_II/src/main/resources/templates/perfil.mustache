@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SiGU - Mi Perfil</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="w-full min-h-screen bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-4 md:p-8">
+
+    <div class="max-w-4xl mx-auto">
+
+        <!-- Header -->
+        <div class="mb-6 flex items-center justify-between">
+            <h1 class="text-3xl font-bold text-[#ccd0fc]">Mi Perfil</h1>
+            <a href="/dashboard" class="flex items-center gap-2 text-[#ccd0fc] hover:text-white transition-colors duration-200 text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+                Volver al panel
+            </a>
+        </div>
+
+        <!-- Mensajes flash -->
+        {{#successMessage}}
+        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-6" role="alert">
+            <span class="block sm:inline">{{successMessage}}</span>
+        </div>
+        {{/successMessage}}
+        {{#errorMessage}}
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-6" role="alert">
+            <span class="block sm:inline">{{errorMessage}}</span>
+        </div>
+        {{/errorMessage}}
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+            <!-- Columna izquierda: foto + upload -->
+            <div class="md:col-span-1 flex flex-col gap-4">
+                <div class="bg-gradient-to-b from-[#190019] to-[#2d0a2d] rounded-xl p-6 shadow-lg flex flex-col items-center gap-4">
+                    <img
+                        id="fotoPerfil"
+                        src="{{foto_perfil}}"
+                        alt="Foto de perfil"
+                        class="w-32 h-32 rounded-full object-cover border-4 border-[#ccd0fc]/30 shadow-md"
+                        onerror="this.src='https://ui-avatars.com/api/?name={{nombre}}+{{apellido}}&background=854f6c&color=ccd0fc&size=128'"
+                    >
+                    <div class="text-center">
+                        <p class="text-[#ccd0fc] font-semibold text-lg">{{nombre}} {{apellido}}</p>
+                        <span class="inline-block mt-1 px-3 py-0.5 rounded-full text-xs font-bold
+                            {{#isDocente}}bg-orange-500/20 text-orange-300 border border-orange-500/40{{/isDocente}}
+                            {{#isEstudiante}}bg-green-500/20 text-green-300 border border-green-500/40{{/isEstudiante}}
+                            {{#isSecretaria}}bg-blue-500/20 text-blue-300 border border-blue-500/40{{/isSecretaria}}
+                            {{#isAdminRol}}bg-rose-500/20 text-rose-300 border border-rose-500/40{{/isAdminRol}}
+                        ">{{nivel_acceso}}</span>
+                    </div>
+                </div>
+
+                <!-- Formulario de subida de foto -->
+                <div class="bg-gradient-to-b from-[#190019] to-[#2d0a2d] rounded-xl p-6 shadow-lg">
+                    <h3 class="text-[#ccd0fc] font-semibold mb-3 text-sm uppercase tracking-wider">Actualizar foto</h3>
+                    <form action="/perfil/foto" method="post" enctype="multipart/form-data" class="flex flex-col gap-3">
+                        <label class="block">
+                            <span class="text-white/60 text-xs mb-1 block">JPG o PNG, máximo 2 MB</span>
+                            <input
+                                type="file"
+                                name="foto"
+                                accept=".jpg,.jpeg,.png"
+                                required
+                                class="block w-full text-sm text-white/70
+                                       file:mr-3 file:py-1.5 file:px-3
+                                       file:rounded-md file:border-0
+                                       file:text-xs file:font-semibold
+                                       file:bg-[#ccd0fc]/20 file:text-[#ccd0fc]
+                                       hover:file:bg-[#ccd0fc]/30 cursor-pointer"
+                            >
+                        </label>
+                        <button type="submit"
+                            class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition duration-300 text-sm font-semibold">
+                            Subir foto
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Columna derecha: datos -->
+            <div class="md:col-span-2 flex flex-col gap-4">
+
+                <!-- Datos personales -->
+                <div class="bg-gradient-to-b from-[#190019] to-[#2d0a2d] rounded-xl p-6 shadow-lg">
+                    <h3 class="text-[#ccd0fc] font-semibold mb-4 text-sm uppercase tracking-wider border-b border-white/10 pb-2">
+                        Datos Personales
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-white/50 text-xs uppercase tracking-wider mb-0.5">Nombre</p>
+                            <p class="text-white font-medium">{{nombre}}</p>
+                        </div>
+                        <div>
+                            <p class="text-white/50 text-xs uppercase tracking-wider mb-0.5">Apellido</p>
+                            <p class="text-white font-medium">{{apellido}}</p>
+                        </div>
+                        <div>
+                            <p class="text-white/50 text-xs uppercase tracking-wider mb-0.5">DNI</p>
+                            <p class="text-white font-medium font-mono">{{dni}}</p>
+                        </div>
+                        <div>
+                            <p class="text-white/50 text-xs uppercase tracking-wider mb-0.5">Usuario</p>
+                            <p class="text-white font-medium">{{nombre_usuario}}</p>
+                        </div>
+                        <div>
+                            <p class="text-white/50 text-xs uppercase tracking-wider mb-0.5">Dirección</p>
+                            <p class="text-white/80">{{direccion}}</p>
+                        </div>
+                        <div>
+                            <p class="text-white/50 text-xs uppercase tracking-wider mb-0.5">Teléfono</p>
+                            <p class="text-white/80">{{telefono}}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Datos de DOCENTE -->
+                {{#isDocente}}
+                <div class="bg-gradient-to-b from-[#190019] to-[#2d0a2d] rounded-xl p-6 shadow-lg">
+                    <h3 class="text-orange-300 font-semibold mb-4 text-sm uppercase tracking-wider border-b border-orange-500/20 pb-2">
+                        Datos Docentes
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-white/50 text-xs uppercase tracking-wider mb-0.5">Legajo Docente</p>
+                            <p class="text-white font-medium font-mono">{{legajo_docente}}</p>
+                        </div>
+                        <div>
+                            <p class="text-white/50 text-xs uppercase tracking-wider mb-0.5">CUIL</p>
+                            <p class="text-white font-medium font-mono">{{cuil}}</p>
+                        </div>
+                        <div>
+                            <p class="text-white/50 text-xs uppercase tracking-wider mb-0.5">Email institucional</p>
+                            <p class="text-white/80">{{email}}</p>
+                        </div>
+                        <div>
+                            <p class="text-white/50 text-xs uppercase tracking-wider mb-0.5">Especialidad / Título</p>
+                            <p class="text-white/80">{{especialidad}}</p>
+                        </div>
+                    </div>
+                </div>
+                {{/isDocente}}
+
+                <!-- Datos de ESTUDIANTE -->
+                {{#isEstudiante}}
+                <div class="bg-gradient-to-b from-[#190019] to-[#2d0a2d] rounded-xl p-6 shadow-lg">
+                    <h3 class="text-green-300 font-semibold mb-4 text-sm uppercase tracking-wider border-b border-green-500/20 pb-2">
+                        Datos Académicos
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-white/50 text-xs uppercase tracking-wider mb-0.5">Legajo</p>
+                            <p class="text-white font-medium font-mono">{{legajo}}</p>
+                        </div>
+                        <div>
+                            <p class="text-white/50 text-xs uppercase tracking-wider mb-0.5">Tipo de estudiante</p>
+                            <p class="text-white font-medium">{{tipo_estudiante}}</p>
+                        </div>
+                        <div class="sm:col-span-2">
+                            <p class="text-white/50 text-xs uppercase tracking-wider mb-0.5">Carrera</p>
+                            <p class="text-white/80">{{carrera}}</p>
+                        </div>
+                    </div>
+                </div>
+                {{/isEstudiante}}
+
+                <!-- Datos de SECRETARIA -->
+                {{#isSecretaria}}
+                <div class="bg-gradient-to-b from-[#190019] to-[#2d0a2d] rounded-xl p-6 shadow-lg">
+                    <h3 class="text-blue-300 font-semibold mb-4 text-sm uppercase tracking-wider border-b border-blue-500/20 pb-2">
+                        Datos Administrativos
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-white/50 text-xs uppercase tracking-wider mb-0.5">Oficina</p>
+                            <p class="text-white font-medium">{{oficina}}</p>
+                        </div>
+                        <div>
+                            <p class="text-white/50 text-xs uppercase tracking-wider mb-0.5">Interno</p>
+                            <p class="text-white font-medium font-mono">{{interno}}</p>
+                        </div>
+                    </div>
+                </div>
+                {{/isSecretaria}}
+
+                <!-- Datos de ADMIN -->
+                {{#isAdminRol}}
+                <div class="bg-gradient-to-b from-[#190019] to-[#2d0a2d] rounded-xl p-6 shadow-lg">
+                    <h3 class="text-rose-300 font-semibold mb-4 text-sm uppercase tracking-wider border-b border-rose-500/20 pb-2">
+                        Administrador del Sistema
+                    </h3>
+                    <div>
+                        <p class="text-white/50 text-xs uppercase tracking-wider mb-0.5">Área de responsabilidad</p>
+                        <p class="text-white/80">{{area_responsabilidad}}</p>
+                    </div>
+                </div>
+                {{/isAdminRol}}
+
+            </div>
+        </div>
+    </div>
+</body>
+</html>

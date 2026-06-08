@@ -246,6 +246,16 @@ CREATE TABLE Inscripcion_Parcial (
     UNIQUE KEY unique_estudiante_parcial (usuario_id, anuncio_id)
 ) ENGINE=InnoDB;
  
+-- ============================================================
+-- ISSUE 28 — Migración: columna foto_perfil en tabla users
+-- Ejecutar sobre la BD existente (no reemplaza scheme.sql)
+-- MySQL InnoDB aplicará el DEFAULT a todas las filas existentes
+-- ============================================================
+ 
+ALTER TABLE users
+    ADD COLUMN foto_perfil VARCHAR(255) DEFAULT '/img/default-avatar.png';
+ 
+ 
 INSERT IGNORE INTO users (dni, nombre, apellido, nombre_usuario, password, nivel_acceso) 
 VALUES (
     '00000000', 

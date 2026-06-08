@@ -32,12 +32,7 @@
             <div class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-lg w-full max-w-2xl">
                 <h2 class="text-2xl font-bold text-blue-700 mb-3">Tu Perfil</h2>
                 <p class="text-gray-50 mb-4">Gestiona la información de tu cuenta.</p>
-                <a href="/profile" class="inline-block bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition duration-300">Ver Perfil</a>
-            </div>
-            <div class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-lg w-full max-w-2xl">
-                <h2 class="text-2xl font-bold text-pink-700 mb-3">Configuraciones</h2>
-                <p class="text-gray-50 mb-4">Ajusta las preferencias de tu aplicación.</p>
-                <a href="/settings" class="inline-block bg-pink-600 text-white py-2 px-4 rounded-md hover:bg-pink-900 transition duration-300">Configuración</a>
+                <a href="/perfil" class="inline-block bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition duration-300">Ver Perfil</a>
             </div>
             {{#isAdmin}}
             <div class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-lg w-full max-w-2xl">
@@ -73,6 +68,13 @@
                 <p class="text-gray-50 mb-4">Configurar nuevas asignaturas, asignación de cuatrimestres y régimen de correlatividades.</p>
                 <a href="/materia/new" class="inline-block bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition duration-300">Cargar</a>
             </div>
+            <div class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-lg">
+                <h2 class="text-2xl font-bold text-rose-400 mb-3">⚙ Configuración</h2>
+                <p class="text-gray-50 mb-4">Buscar, editar y eliminar docentes, estudiantes y materias del sistema.</p>
+                <a href="/configuracion" class="inline-block bg-rose-600 text-white py-2 px-4 rounded-md hover:bg-rose-700 transition duration-300">Administrar</a>
+            </div>
+
+
             {{/isAdmin}}
 
             {{#isDocente}}
@@ -104,11 +106,17 @@
             </div>
             
             <div class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-lg w-full max-w-2xl">
-                <h2 class="text-2xl font-bold text-blue-400 mb-3">Mesas de Examen</h2>
-                <p class="text-gray-50 mb-4">Inscribite a los llamados de exámenes finales disponibles para tu condición académica.</p>
-                <a href="/estudiante/inscripcion/examen" class="inline-block bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition duration-300">Inscribirse</a>
+                <h2 class="text-2xl font-bold text-blue-400 mb-3">Inscripción a Exámenes</h2>
+                <p class="text-gray-50 mb-4">Anotate para rendir exámenes finales en las materias que tenés regulares o libres.</p>
+                <a href="/estudiante/inscripcion/examen" class="inline-block bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition duration-300">Inscribir Exámenes</a>
             </div>
 
+
+            <div class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-lg w-full max-w-2xl">
+                <h2 class="text-2xl font-bold text-purple-400 mb-3">Aula Virtual</h2>
+                <p class="text-gray-50 mb-4">Accedé al material, anuncios, aulas y notas de las materias que estás cursando o aprobaste.</p>
+                <a href="/estudiante/aula-virtual" class="inline-block bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 transition duration-300">Ingresar</a>
+            </div>
             <a href="/estudiante/materias"
                 class="block bg-white/10 hover:bg-white/15 border border-white/20
                 rounded-xl p-6 transition-all duration-200 group">

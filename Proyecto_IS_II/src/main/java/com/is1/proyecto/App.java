@@ -39,6 +39,18 @@ import org.mindrot.jbcrypt.BCrypt; // Utilidad para hashear y verificar contrase
 // Importaciones de Spark para renderizado de plantillas
 import spark.ModelAndView; // Representa un modelo de datos y el nombre de la vista a renderizar.
 import spark.template.mustache.MustacheTemplateEngine; // Motor de plantillas Mustache para Spark.
+// Importaciones para ISSUE #28
+import javax.servlet.MultipartConfigElement;
+import javax.servlet.http.Part;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
+
+
+
 
 /**
  * Clase principal de la aplicación Spark.
@@ -59,6 +71,16 @@ public class App {
 
         // Obtener la instancia única del singleton de configuración de la base de datos.
         DBConfigSingleton dbConfig = DBConfigSingleton.getInstance();
+
+
+        String STATIC_DIR  = System.getProperty("user.dir") + "/public";
+        String UPLOAD_DIR  = STATIC_DIR + "/img/uploads";
+        try {
+            java.nio.file.Files.createDirectories(java.nio.file.Paths.get(UPLOAD_DIR));
+        } catch (java.io.IOException e) {
+            System.err.println("No se pudo crear la carpeta de imágenes: " + e.getMessage());
+        }
+        staticFiles.externalLocation(STATIC_DIR);
 
         // --- Filtro 'before' para gestionar la conexión a la base de datos ---
         // Este filtro se ejecuta antes de cada solicitud HTTP.
@@ -149,6 +171,8 @@ public class App {
                 );
                 model.put("isDocente", "DOCENTE".equals(userRole));
                 model.put("isEstudiante", "ESTUDIANTE".equals(userRole));
+                model.put("isSecretaria",        "SECRETARIA".equals(userRole));
+                model.put("isAdminOrSecretaria", "ADMIN".equals(userRole) || "SECRETARIA".equals(userRole));
 
                 return new ModelAndView(model, "dashboard.mustache");
             },
@@ -3379,6 +3403,704 @@ public class App {
             }
             return null;
         });
+
+        get("/perfil", (req, res) -> {
+        Boolean loggedIn = req.session().attribute("loggedIn");
+        if (!Boolean.TRUE.equals(loggedIn)) {
+            res.redirect("/login");
+            return null;
+        }
+    
+        Object userIdObj = req.session().attribute("userId");
+        int    userId    = ((Number) userIdObj).intValue();
+        String userRole  = req.session().attribute("userRole");
+    
+        // Datos base del usuario
+        List<Map> userRows = Base.findAll(
+            "SELECT nombre, apellido, dni, direccion, telefono, " +
+            "       nombre_usuario, nivel_acceso, foto_perfil " +
+            "FROM users WHERE id = ?",
+            userId
+        );
+        if (userRows.isEmpty()) {
+            res.redirect("/login");
+            return null;
+        }
+        Map user = userRows.get(0);
+    
+        Map<String, Object> model = new HashMap<>();
+        model.put("nombre",         user.get("nombre"));
+        model.put("apellido",       user.get("apellido"));
+        model.put("dni",            user.get("dni"));
+        model.put("direccion",      user.get("direccion") != null ? user.get("direccion") : "—");
+        model.put("telefono",       user.get("telefono")  != null ? user.get("telefono")  : "—");
+        model.put("nombre_usuario", user.get("nombre_usuario"));
+        model.put("nivel_acceso",   user.get("nivel_acceso"));
+        String fotoActual = user.get("foto_perfil") != null
+            ? (String) user.get("foto_perfil")
+            : "/img/default-avatar.png";
+        model.put("foto_perfil", fotoActual);
+    
+        // Datos específicos según rol
+        if ("DOCENTE".equals(userRole)) {
+            model.put("isDocente", true);
+            List<Map> rows = Base.findAll(
+                "SELECT legajo_docente, cuil, email, especialidad " +
+                "FROM teacher WHERE usuario_id = ?", userId
+            );
+            if (!rows.isEmpty()) {
+                Map t = rows.get(0);
+                model.put("legajo_docente", t.get("legajo_docente"));
+                model.put("cuil",           t.get("cuil"));
+                model.put("email",          t.get("email"));
+                model.put("especialidad",   t.get("especialidad") != null ? t.get("especialidad") : "—");
+            }
+    
+        } else if ("ESTUDIANTE".equals(userRole)) {
+            model.put("isEstudiante", true);
+            List<Map> rows = Base.findAll(
+                "SELECT s.legajo, s.tipo_estudiante, c.nombre AS carrera " +
+                "FROM student s " +
+                "JOIN Plan_Estudio pe ON pe.id = s.plan_estudio_id " +
+                "JOIN Carrera c       ON c.id  = pe.carrera_id " +
+                "WHERE s.usuario_id = ?", userId
+            );
+            if (!rows.isEmpty()) {
+                Map s = rows.get(0);
+                model.put("legajo",          s.get("legajo"));
+                model.put("tipo_estudiante", s.get("tipo_estudiante"));
+                model.put("carrera",         s.get("carrera"));
+            }
+    
+        } else if ("SECRETARIA".equals(userRole)) {
+            model.put("isSecretaria", true);
+            List<Map> rows = Base.findAll(
+                "SELECT oficina, interno FROM secretariaAcademica WHERE usuario_id = ?", userId
+            );
+            if (!rows.isEmpty()) {
+                Map sa = rows.get(0);
+                model.put("oficina", sa.get("oficina") != null ? sa.get("oficina") : "—");
+                model.put("interno", sa.get("interno") != null ? sa.get("interno") : "—");
+            }
+    
+        } else if ("ADMIN".equals(userRole)) {
+            model.put("isAdminRol", true);
+            List<Map> rows = Base.findAll(
+                "SELECT area_responsabilidad FROM gestorSistema WHERE usuario_id = ?", userId
+            );
+            if (!rows.isEmpty()) {
+                Object area = rows.get(0).get("area_responsabilidad");
+                model.put("area_responsabilidad", area != null ? area : "—");
+            }
+        }
+    
+        String success = req.queryParams("message");
+        String error   = req.queryParams("error");
+        if (success != null && !success.isEmpty()) model.put("successMessage", success);
+        if (error   != null && !error.isEmpty())   model.put("errorMessage",   error);
+    
+        return new ModelAndView(model, "perfil.mustache");
+    }, new MustacheTemplateEngine());
+    
+    
+    // ----------------------------------------------------------------
+    // POST /perfil/foto — subida/actualización de foto de perfil
+    // ----------------------------------------------------------------
+    post("/perfil/foto", (req, res) -> {
+        Boolean loggedIn = req.session().attribute("loggedIn");
+        if (!Boolean.TRUE.equals(loggedIn)) {
+            res.redirect("/login");
+            return null;
+        }
+    
+        Object userIdObj = req.session().attribute("userId");
+        int    userId    = ((Number) userIdObj).intValue();
+    
+        // Configurar multipart ANTES de llamar getPart()
+        req.raw().setAttribute(
+            "org.eclipse.jetty.multipartConfig",
+            new MultipartConfigElement(
+                System.getProperty("java.io.tmpdir"),
+                2L * 1024 * 1024,  // máx tamaño de archivo: 2 MB
+                4L * 1024 * 1024,  // máx tamaño de request: 4 MB
+                0                  // umbral en memoria
+            )
+        );
+    
+        try {
+            Part fotoPart = req.raw().getPart("foto");
+    
+            if (fotoPart == null || fotoPart.getSize() == 0) {
+                res.redirect("/perfil?error=" + URLEncoder.encode(
+                    "No se recibió ningún archivo.", StandardCharsets.UTF_8.toString()));
+                return null;
+            }
+    
+            String submittedName = fotoPart.getSubmittedFileName();
+            if (submittedName == null || !submittedName.contains(".")) {
+                res.redirect("/perfil?error=" + URLEncoder.encode(
+                    "Nombre de archivo inválido.", StandardCharsets.UTF_8.toString()));
+                return null;
+            }
+    
+            String ext = submittedName.substring(submittedName.lastIndexOf('.') + 1).toLowerCase();
+            if (!Arrays.asList("jpg", "jpeg", "png").contains(ext)) {
+                res.redirect("/perfil?error=" + URLEncoder.encode(
+                    "Solo se permiten imágenes JPG o PNG.", StandardCharsets.UTF_8.toString()));
+                return null;
+            }
+    
+            String contentType = fotoPart.getContentType();
+            if (contentType == null || !contentType.startsWith("image/")) {
+                res.redirect("/perfil?error=" + URLEncoder.encode(
+                    "El archivo no es una imagen válida.", StandardCharsets.UTF_8.toString()));
+                return null;
+            }
+    
+            // Guardar con nombre controlado (evita path traversal)
+            String STATIC_DIR_LOCAL = System.getProperty("user.dir") + "/public";
+            String UPLOAD_DIR_LOCAL = STATIC_DIR_LOCAL + "/img/uploads";
+            Files.createDirectories(Paths.get(UPLOAD_DIR_LOCAL));
+    
+            String savedName = "perfil_" + userId + "." + ext;
+            Path   targetPath = Paths.get(UPLOAD_DIR_LOCAL, savedName);
+    
+            try (InputStream is = fotoPart.getInputStream()) {
+                Files.copy(is, targetPath, StandardCopyOption.REPLACE_EXISTING);
+            }
+    
+            String fotoUrl = "/img/uploads/" + savedName;
+            Base.exec("UPDATE users SET foto_perfil = ? WHERE id = ?", fotoUrl, userId);
+    
+            res.redirect("/perfil?message=" + URLEncoder.encode(
+                "Foto de perfil actualizada exitosamente.", StandardCharsets.UTF_8.toString()));
+    
+        } catch (Exception e) {
+            e.printStackTrace();
+            res.redirect("/perfil?error=" + URLEncoder.encode(
+                "Error al procesar la imagen: " + e.getMessage(), StandardCharsets.UTF_8.toString()));
+        }
+        return null;
+    });
+    
+    
+    // ----------------------------------------------------------------
+    // GET /configuracion — panel ABM (solo ADMIN o SECRETARIA)
+    // ----------------------------------------------------------------
+    get("/configuracion", (req, res) -> {
+        Boolean loggedIn = req.session().attribute("loggedIn");
+        String  userRole = req.session().attribute("userRole");
+        if (!Boolean.TRUE.equals(loggedIn)) {
+            res.redirect("/login");
+            return null;
+        }
+        if (!"ADMIN".equals(userRole) && !"SECRETARIA".equals(userRole)) {
+            res.status(403);
+            Map<String, Object> errModel = new HashMap<>();
+            errModel.put("errorMessage", "Acceso denegado. Solo ADMIN o SECRETARIA pueden acceder a Configuración.");
+            return new ModelAndView(errModel, "error.mustache");
+        }
+    
+        // Docentes
+        List<Map> docentesDB = Base.findAll(
+            "SELECT u.id, u.nombre, u.apellido, u.dni, " +
+            "       t.legajo_docente, t.email, t.especialidad " +
+            "FROM users u " +
+            "JOIN teacher t ON t.usuario_id = u.id " +
+            "ORDER BY u.apellido ASC, u.nombre ASC"
+        );
+        List<Map<String, Object>> docentesList = new ArrayList<>();
+        for (Map d : docentesDB) {
+            Map<String, Object> dm = new HashMap<>();
+            dm.put("id",             ((Number) d.get("id")).intValue());
+            dm.put("nombre",         d.get("nombre") + " " + d.get("apellido"));
+            dm.put("dni",            d.get("dni"));
+            dm.put("legajo",         d.get("legajo_docente"));
+            dm.put("email",          d.get("email"));
+            dm.put("especialidad",   d.get("especialidad") != null ? d.get("especialidad") : "—");
+            docentesList.add(dm);
+        }
+    
+        // Estudiantes
+        List<Map> estudiantesDB = Base.findAll(
+            "SELECT u.id, u.nombre, u.apellido, u.dni, " +
+            "       s.legajo, s.tipo_estudiante, c.nombre AS carrera " +
+            "FROM users u " +
+            "JOIN student s      ON s.usuario_id  = u.id " +
+            "JOIN Plan_Estudio pe ON pe.id         = s.plan_estudio_id " +
+            "JOIN Carrera c       ON c.id          = pe.carrera_id " +
+            "ORDER BY u.apellido ASC, u.nombre ASC"
+        );
+        List<Map<String, Object>> estudiantesList = new ArrayList<>();
+        for (Map e : estudiantesDB) {
+            Map<String, Object> em = new HashMap<>();
+            em.put("id",      ((Number) e.get("id")).intValue());
+            em.put("nombre",  e.get("nombre") + " " + e.get("apellido"));
+            em.put("dni",     e.get("dni"));
+            em.put("legajo",  e.get("legajo"));
+            em.put("tipo",    e.get("tipo_estudiante"));
+            em.put("carrera", e.get("carrera"));
+            estudiantesList.add(em);
+        }
+    
+        // Materias
+        List<Map> materiasDB = Base.findAll(
+            "SELECT m.codigo, m.nombre, m.anio_cursada, m.carga_horaria_total, " +
+            "       c.nombre AS carrera " +
+            "FROM Materia m " +
+            "JOIN Plan_Estudio pe ON pe.id = m.plan_estudio_id " +
+            "JOIN Carrera c       ON c.id  = pe.carrera_id " +
+            "ORDER BY c.nombre ASC, m.anio_cursada ASC, m.nombre ASC"
+        );
+        List<Map<String, Object>> materiasList = new ArrayList<>();
+        for (Map m : materiasDB) {
+            Map<String, Object> mm = new HashMap<>();
+            mm.put("codigo",  ((Number) m.get("codigo")).intValue());
+            mm.put("nombre",  m.get("nombre"));
+            mm.put("anio",    m.get("anio_cursada"));
+            mm.put("carga",   m.get("carga_horaria_total") != null ? m.get("carga_horaria_total") : "—");
+            mm.put("carrera", m.get("carrera"));
+            materiasList.add(mm);
+        }
+    
+        Map<String, Object> model = new HashMap<>();
+        model.put("docentes",    docentesList);
+        model.put("estudiantes", estudiantesList);
+        model.put("materias",    materiasList);
+    
+        String success = req.queryParams("message");
+        String error   = req.queryParams("error");
+        if (success != null && !success.isEmpty()) model.put("successMessage", success);
+        if (error   != null && !error.isEmpty())   model.put("errorMessage",   error);
+    
+        return new ModelAndView(model, "configuracion.mustache");
+    }, new MustacheTemplateEngine());
+    
+    
+    // ----------------------------------------------------------------
+    // GET /docente/edit/:id — formulario de edición de docente
+    // ----------------------------------------------------------------
+    get("/docente/edit/:id", (req, res) -> {
+        Boolean loggedIn = req.session().attribute("loggedIn");
+        String  userRole = req.session().attribute("userRole");
+        if (!Boolean.TRUE.equals(loggedIn)) { res.redirect("/login"); return null; }
+        if (!"ADMIN".equals(userRole) && !"SECRETARIA".equals(userRole)) {
+            res.status(403);
+            Map<String, Object> em = new HashMap<>();
+            em.put("errorMessage", "Acceso denegado.");
+            return new ModelAndView(em, "error.mustache");
+        }
+    
+        int docenteId = Integer.parseInt(req.params("id"));
+        List<Map> rows = Base.findAll(
+            "SELECT u.id, u.nombre, u.apellido, u.dni, u.direccion, u.telefono, " +
+            "       u.nombre_usuario, t.legajo_docente, t.cuil, t.email, t.especialidad " +
+            "FROM users u JOIN teacher t ON t.usuario_id = u.id " +
+            "WHERE u.id = ? AND u.nivel_acceso = 'DOCENTE'",
+            docenteId
+        );
+        if (rows.isEmpty()) {
+            res.redirect("/configuracion?error=" + URLEncoder.encode(
+                "Docente no encontrado.", StandardCharsets.UTF_8.toString()));
+            return null;
+        }
+        Map d = rows.get(0);
+        Map<String, Object> model = new HashMap<>();
+        model.put("id",             ((Number) d.get("id")).intValue());
+        model.put("nombre",         d.get("nombre"));
+        model.put("apellido",       d.get("apellido"));
+        model.put("dni",            d.get("dni"));
+        model.put("direccion",      d.get("direccion") != null ? d.get("direccion") : "");
+        model.put("telefono",       d.get("telefono")  != null ? d.get("telefono")  : "");
+        model.put("nombre_usuario", d.get("nombre_usuario"));
+        model.put("legajo_docente", d.get("legajo_docente"));
+        model.put("cuil",           d.get("cuil"));
+        model.put("email",          d.get("email"));
+        model.put("especialidad",   d.get("especialidad") != null ? d.get("especialidad") : "");
+    
+        String err = req.queryParams("error");
+        if (err != null && !err.isEmpty()) model.put("errorMessage", err);
+    
+        return new ModelAndView(model, "docente_edit_form.mustache");
+    }, new MustacheTemplateEngine());
+    
+    
+    // ----------------------------------------------------------------
+    // POST /docente/edit/:id — persiste cambios de docente
+    // ----------------------------------------------------------------
+    post("/docente/edit/:id", (req, res) -> {
+        Boolean loggedIn = req.session().attribute("loggedIn");
+        String  userRole = req.session().attribute("userRole");
+        if (!Boolean.TRUE.equals(loggedIn)) { res.redirect("/login"); return null; }
+        if (!"ADMIN".equals(userRole) && !"SECRETARIA".equals(userRole)) {
+            res.status(403); return "Acceso denegado.";
+        }
+    
+        int docenteId = Integer.parseInt(req.params("id"));
+    
+        String nombre      = req.queryParams("nombre");
+        String apellido    = req.queryParams("apellido");
+        String dni         = req.queryParams("dni");
+        String direccion   = req.queryParams("direccion");
+        String telefono    = req.queryParams("telefono");
+        String email       = req.queryParams("email");
+        String especialidad = req.queryParams("especialidad");
+    
+        if (nombre == null || nombre.isBlank() ||
+            apellido == null || apellido.isBlank() ||
+            email == null || email.isBlank()) {
+            res.redirect("/docente/edit/" + docenteId + "?error=" + URLEncoder.encode(
+                "Nombre, apellido y email son obligatorios.", StandardCharsets.UTF_8.toString()));
+            return null;
+        }
+    
+        try {
+            Base.openTransaction();
+            Base.exec(
+                "UPDATE users SET nombre = ?, apellido = ?, dni = ?, " +
+                "                 direccion = ?, telefono = ? WHERE id = ?",
+                nombre.trim(), apellido.trim(), dni != null ? dni.trim() : "",
+                direccion, telefono, docenteId
+            );
+            Base.exec(
+                "UPDATE teacher SET email = ?, especialidad = ? WHERE usuario_id = ?",
+                email.trim(), especialidad, docenteId
+            );
+            Base.commitTransaction();
+            res.redirect("/configuracion?message=" + URLEncoder.encode(
+                "Docente actualizado correctamente.", StandardCharsets.UTF_8.toString()) + "#docentes");
+        } catch (Exception e) {
+            Base.rollbackTransaction();
+            e.printStackTrace();
+            res.redirect("/docente/edit/" + docenteId + "?error=" + URLEncoder.encode(
+                "Error al guardar: " + e.getMessage(), StandardCharsets.UTF_8.toString()));
+        }
+        return null;
+    });
+    
+    
+    // ----------------------------------------------------------------
+    // POST /docente/delete/:id — elimina docente (cascade en BD)
+    // ----------------------------------------------------------------
+    post("/docente/delete/:id", (req, res) -> {
+        Boolean loggedIn = req.session().attribute("loggedIn");
+        String  userRole = req.session().attribute("userRole");
+        if (!Boolean.TRUE.equals(loggedIn)) { res.redirect("/login"); return null; }
+        if (!"ADMIN".equals(userRole) && !"SECRETARIA".equals(userRole)) {
+            res.status(403); return "Acceso denegado.";
+        }
+    
+        int docenteId  = Integer.parseInt(req.params("id"));
+        Object currentUserId = req.session().attribute("userId");
+        int    myId     = ((Number) currentUserId).intValue();
+    
+        if (docenteId == myId) {
+            res.redirect("/configuracion?error=" + URLEncoder.encode(
+                "No podés eliminar tu propio usuario.", StandardCharsets.UTF_8.toString()) + "#docentes");
+            return null;
+        }
+    
+        List<Map> check = Base.findAll(
+            "SELECT id FROM users WHERE id = ? AND nivel_acceso = 'DOCENTE'", docenteId
+        );
+        if (check.isEmpty()) {
+            res.redirect("/configuracion?error=" + URLEncoder.encode(
+                "Docente no encontrado.", StandardCharsets.UTF_8.toString()) + "#docentes");
+            return null;
+        }
+    
+        try {
+            // ON DELETE CASCADE en teacher, Docente_Materia, Docente_Carrera,
+            // Anuncio, Nota, sesion → todo se limpia automáticamente
+            Base.exec("DELETE FROM users WHERE id = ?", docenteId);
+            res.redirect("/configuracion?message=" + URLEncoder.encode(
+                "Docente eliminado correctamente.", StandardCharsets.UTF_8.toString()) + "#docentes");
+        } catch (Exception e) {
+            e.printStackTrace();
+            res.redirect("/configuracion?error=" + URLEncoder.encode(
+                "Error al eliminar: " + e.getMessage(), StandardCharsets.UTF_8.toString()) + "#docentes");
+        }
+        return null;
+    });
+    
+    
+    // ----------------------------------------------------------------
+    // GET /estudiante/edit/:id — formulario de edición de estudiante
+    // ----------------------------------------------------------------
+    get("/estudiante/edit/:id", (req, res) -> {
+        Boolean loggedIn = req.session().attribute("loggedIn");
+        String  userRole = req.session().attribute("userRole");
+        if (!Boolean.TRUE.equals(loggedIn)) { res.redirect("/login"); return null; }
+        if (!"ADMIN".equals(userRole) && !"SECRETARIA".equals(userRole)) {
+            res.status(403);
+            Map<String, Object> em = new HashMap<>();
+            em.put("errorMessage", "Acceso denegado.");
+            return new ModelAndView(em, "error.mustache");
+        }
+    
+        int estudianteId = Integer.parseInt(req.params("id"));
+        List<Map> rows = Base.findAll(
+            "SELECT u.id, u.nombre, u.apellido, u.dni, u.direccion, u.telefono, " +
+            "       u.nombre_usuario, s.legajo, s.tipo_estudiante " +
+            "FROM users u JOIN student s ON s.usuario_id = u.id " +
+            "WHERE u.id = ? AND u.nivel_acceso = 'ESTUDIANTE'",
+            estudianteId
+        );
+        if (rows.isEmpty()) {
+            res.redirect("/configuracion?error=" + URLEncoder.encode(
+                "Estudiante no encontrado.", StandardCharsets.UTF_8.toString()));
+            return null;
+        }
+        Map e = rows.get(0);
+        String tipo = (String) e.get("tipo_estudiante");
+    
+        Map<String, Object> model = new HashMap<>();
+        model.put("id",             ((Number) e.get("id")).intValue());
+        model.put("nombre",         e.get("nombre"));
+        model.put("apellido",       e.get("apellido"));
+        model.put("dni",            e.get("dni"));
+        model.put("direccion",      e.get("direccion") != null ? e.get("direccion") : "");
+        model.put("telefono",       e.get("telefono")  != null ? e.get("telefono")  : "");
+        model.put("nombre_usuario", e.get("nombre_usuario"));
+        model.put("legajo",         e.get("legajo"));
+        // Flags para pre-seleccionar el <select> de tipo_estudiante en Mustache
+        model.put("esRegular",      "REGULAR".equals(tipo));
+        model.put("esVocacional",   "VOCACIONAL".equals(tipo));
+        model.put("esIntercambio",  "INTERCAMBIO".equals(tipo));
+    
+        String err = req.queryParams("error");
+        if (err != null && !err.isEmpty()) model.put("errorMessage", err);
+    
+        return new ModelAndView(model, "estudiante_edit_form.mustache");
+    }, new MustacheTemplateEngine());
+    
+    
+    // ----------------------------------------------------------------
+    // POST /estudiante/edit/:id — persiste cambios de estudiante
+    // ----------------------------------------------------------------
+    post("/estudiante/edit/:id", (req, res) -> {
+        Boolean loggedIn = req.session().attribute("loggedIn");
+        String  userRole = req.session().attribute("userRole");
+        if (!Boolean.TRUE.equals(loggedIn)) { res.redirect("/login"); return null; }
+        if (!"ADMIN".equals(userRole) && !"SECRETARIA".equals(userRole)) {
+            res.status(403); return "Acceso denegado.";
+        }
+    
+        int estudianteId = Integer.parseInt(req.params("id"));
+    
+        String nombre        = req.queryParams("nombre");
+        String apellido      = req.queryParams("apellido");
+        String dni           = req.queryParams("dni");
+        String direccion     = req.queryParams("direccion");
+        String telefono      = req.queryParams("telefono");
+        String tipoEstudiante = req.queryParams("tipo_estudiante");
+    
+        if (nombre == null || nombre.isBlank() || apellido == null || apellido.isBlank()) {
+            res.redirect("/estudiante/edit/" + estudianteId + "?error=" + URLEncoder.encode(
+                "Nombre y apellido son obligatorios.", StandardCharsets.UTF_8.toString()));
+            return null;
+        }
+        List<String> tiposValidos = Arrays.asList("REGULAR", "VOCACIONAL", "INTERCAMBIO");
+        if (tipoEstudiante == null || !tiposValidos.contains(tipoEstudiante)) {
+            res.redirect("/estudiante/edit/" + estudianteId + "?error=" + URLEncoder.encode(
+                "Tipo de estudiante inválido.", StandardCharsets.UTF_8.toString()));
+            return null;
+        }
+    
+        try {
+            Base.openTransaction();
+            Base.exec(
+                "UPDATE users SET nombre = ?, apellido = ?, dni = ?, " +
+                "                 direccion = ?, telefono = ? WHERE id = ?",
+                nombre.trim(), apellido.trim(), dni != null ? dni.trim() : "",
+                direccion, telefono, estudianteId
+            );
+            Base.exec(
+                "UPDATE student SET tipo_estudiante = ? WHERE usuario_id = ?",
+                tipoEstudiante, estudianteId
+            );
+            Base.commitTransaction();
+            res.redirect("/configuracion?message=" + URLEncoder.encode(
+                "Estudiante actualizado correctamente.", StandardCharsets.UTF_8.toString()) + "#estudiantes");
+        } catch (Exception e) {
+            Base.rollbackTransaction();
+            e.printStackTrace();
+            res.redirect("/estudiante/edit/" + estudianteId + "?error=" + URLEncoder.encode(
+                "Error al guardar: " + e.getMessage(), StandardCharsets.UTF_8.toString()));
+        }
+        return null;
+    });
+    
+    
+    // ----------------------------------------------------------------
+    // POST /estudiante/delete/:id — elimina estudiante (cascade en BD)
+    // ----------------------------------------------------------------
+    post("/estudiante/delete/:id", (req, res) -> {
+        Boolean loggedIn = req.session().attribute("loggedIn");
+        String  userRole = req.session().attribute("userRole");
+        if (!Boolean.TRUE.equals(loggedIn)) { res.redirect("/login"); return null; }
+        if (!"ADMIN".equals(userRole) && !"SECRETARIA".equals(userRole)) {
+            res.status(403); return "Acceso denegado.";
+        }
+    
+        int estudianteId = Integer.parseInt(req.params("id"));
+        Object currentUserId = req.session().attribute("userId");
+        int    myId = ((Number) currentUserId).intValue();
+    
+        if (estudianteId == myId) {
+            res.redirect("/configuracion?error=" + URLEncoder.encode(
+                "No podés eliminar tu propio usuario.", StandardCharsets.UTF_8.toString()) + "#estudiantes");
+            return null;
+        }
+    
+        List<Map> check = Base.findAll(
+            "SELECT id FROM users WHERE id = ? AND nivel_acceso = 'ESTUDIANTE'", estudianteId
+        );
+        if (check.isEmpty()) {
+            res.redirect("/configuracion?error=" + URLEncoder.encode(
+                "Estudiante no encontrado.", StandardCharsets.UTF_8.toString()) + "#estudiantes");
+            return null;
+        }
+    
+        try {
+            // ON DELETE CASCADE cubre: student, Estado_Academico, inscripciones_examen,
+            // Nota, Inscripcion_Parcial, sesion → limpieza completa
+            Base.exec("DELETE FROM users WHERE id = ?", estudianteId);
+            res.redirect("/configuracion?message=" + URLEncoder.encode(
+                "Estudiante eliminado correctamente.", StandardCharsets.UTF_8.toString()) + "#estudiantes");
+        } catch (Exception e) {
+            e.printStackTrace();
+            res.redirect("/configuracion?error=" + URLEncoder.encode(
+                "Error al eliminar: " + e.getMessage(), StandardCharsets.UTF_8.toString()) + "#estudiantes");
+        }
+        return null;
+    });
+    
+    
+    // ----------------------------------------------------------------
+    // GET /materia/edit/:codigo — formulario de edición de materia
+    // ----------------------------------------------------------------
+    get("/materia/edit/:codigo", (req, res) -> {
+        Boolean loggedIn = req.session().attribute("loggedIn");
+        String  userRole = req.session().attribute("userRole");
+        if (!Boolean.TRUE.equals(loggedIn)) { res.redirect("/login"); return null; }
+        if (!"ADMIN".equals(userRole) && !"SECRETARIA".equals(userRole)) {
+            res.status(403);
+            Map<String, Object> em = new HashMap<>();
+            em.put("errorMessage", "Acceso denegado.");
+            return new ModelAndView(em, "error.mustache");
+        }
+    
+        int codigo = Integer.parseInt(req.params("codigo"));
+        List<Map> rows = Base.findAll(
+            "SELECT m.codigo, m.nombre, m.anio_cursada, m.carga_horaria_total, " +
+            "       c.nombre AS carrera " +
+            "FROM Materia m " +
+            "JOIN Plan_Estudio pe ON pe.id = m.plan_estudio_id " +
+            "JOIN Carrera c       ON c.id  = pe.carrera_id " +
+            "WHERE m.codigo = ?",
+            codigo
+        );
+        if (rows.isEmpty()) {
+            res.redirect("/configuracion?error=" + URLEncoder.encode(
+                "Materia no encontrada.", StandardCharsets.UTF_8.toString()));
+            return null;
+        }
+        Map m = rows.get(0);
+        Map<String, Object> model = new HashMap<>();
+        model.put("codigo",               ((Number) m.get("codigo")).intValue());
+        model.put("nombre",               m.get("nombre"));
+        model.put("anio_cursada",         m.get("anio_cursada"));
+        model.put("carga_horaria_total",  m.get("carga_horaria_total") != null ? m.get("carga_horaria_total") : "");
+        model.put("carrera",              m.get("carrera"));
+    
+        String err = req.queryParams("error");
+        if (err != null && !err.isEmpty()) model.put("errorMessage", err);
+    
+        return new ModelAndView(model, "materia_edit_form.mustache");
+    }, new MustacheTemplateEngine());
+    
+    
+    // ----------------------------------------------------------------
+    // POST /materia/edit/:codigo — persiste cambios de materia
+    // ----------------------------------------------------------------
+    post("/materia/edit/:codigo", (req, res) -> {
+        Boolean loggedIn = req.session().attribute("loggedIn");
+        String  userRole = req.session().attribute("userRole");
+        if (!Boolean.TRUE.equals(loggedIn)) { res.redirect("/login"); return null; }
+        if (!"ADMIN".equals(userRole) && !"SECRETARIA".equals(userRole)) {
+            res.status(403); return "Acceso denegado.";
+        }
+    
+        int codigo          = Integer.parseInt(req.params("codigo"));
+        String nombre       = req.queryParams("nombre");
+        String anioStr      = req.queryParams("anio_cursada");
+        String cargaStr     = req.queryParams("carga_horaria_total");
+    
+        if (nombre == null || nombre.isBlank() || anioStr == null || anioStr.isBlank()) {
+            res.redirect("/materia/edit/" + codigo + "?error=" + URLEncoder.encode(
+                "Nombre y año de cursada son obligatorios.", StandardCharsets.UTF_8.toString()));
+            return null;
+        }
+    
+        try {
+            int anio = Integer.parseInt(anioStr.trim());
+            Integer carga = (cargaStr != null && !cargaStr.isBlank())
+                ? Integer.parseInt(cargaStr.trim()) : null;
+    
+            Base.exec(
+                "UPDATE Materia SET nombre = ?, anio_cursada = ?, carga_horaria_total = ? " +
+                "WHERE codigo = ?",
+                nombre.trim(), anio, carga, codigo
+            );
+            res.redirect("/configuracion?message=" + URLEncoder.encode(
+                "Materia actualizada correctamente.", StandardCharsets.UTF_8.toString()) + "#materias");
+        } catch (NumberFormatException e) {
+            res.redirect("/materia/edit/" + codigo + "?error=" + URLEncoder.encode(
+                "Año y carga horaria deben ser números.", StandardCharsets.UTF_8.toString()));
+        } catch (Exception e) {
+            e.printStackTrace();
+            res.redirect("/materia/edit/" + codigo + "?error=" + URLEncoder.encode(
+                "Error al guardar: " + e.getMessage(), StandardCharsets.UTF_8.toString()));
+        }
+        return null;
+    });
+    
+    
+    // ----------------------------------------------------------------
+    // POST /materia/delete/:codigo — elimina materia (cascade en BD)
+    // ----------------------------------------------------------------
+    post("/materia/delete/:codigo", (req, res) -> {
+        Boolean loggedIn = req.session().attribute("loggedIn");
+        String  userRole = req.session().attribute("userRole");
+        if (!Boolean.TRUE.equals(loggedIn)) { res.redirect("/login"); return null; }
+        if (!"ADMIN".equals(userRole) && !"SECRETARIA".equals(userRole)) {
+            res.status(403); return "Acceso denegado.";
+        }
+    
+        int codigo = Integer.parseInt(req.params("codigo"));
+    
+        List<Map> check = Base.findAll("SELECT codigo FROM Materia WHERE codigo = ?", codigo);
+        if (check.isEmpty()) {
+            res.redirect("/configuracion?error=" + URLEncoder.encode(
+                "Materia no encontrada.", StandardCharsets.UTF_8.toString()) + "#materias");
+            return null;
+        }
+    
+        try {
+            // ON DELETE CASCADE cubre: Correlatividad, Materia_Periodo, Docente_Materia,
+            // Estado_Academico, inscripciones_examen (via mesas_examen), mesas_examen,
+            // Anuncio, Nota, Aula_Asignacion, SolicitudAula → limpieza completa
+            Base.exec("DELETE FROM Materia WHERE codigo = ?", codigo);
+            res.redirect("/configuracion?message=" + URLEncoder.encode(
+                "Materia eliminada correctamente.", StandardCharsets.UTF_8.toString()) + "#materias");
+        } catch (Exception e) {
+            e.printStackTrace();
+            res.redirect("/configuracion?error=" + URLEncoder.encode(
+                "Error al eliminar: " + e.getMessage(), StandardCharsets.UTF_8.toString()) + "#materias");
+        }
+        return null;
+    });
 
         // Actualizar filtro de inscripción a exámenes para excluir PROMOCION y APROBADO
         // (el GET /estudiante/inscripcion/examen ya filtra correctamente: solo REGULAR o LIBRE pasan)

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SiGU - Editar Estudiante</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="w-full min-h-screen bg-gradient-to-b from-[#190019] to-[#dfb6b2] flex items-center justify-center p-4">
+
+    <div class="w-full max-w-2xl bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-2xl shadow-black/60">
+
+        <h1 class="text-3xl font-bold text-center text-[#ccd0fc] mb-2">Editar Estudiante</h1>
+        <p class="text-center text-white/50 text-sm mb-6">
+            Modificá los datos del estudiante. Los campos marcados con * son obligatorios.
+        </p>
+
+        {{#errorMessage}}
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-6" role="alert">
+            <span class="block sm:inline">{{errorMessage}}</span>
+        </div>
+        {{/errorMessage}}
+
+        <!-- Datos de solo lectura -->
+        <div class="bg-white/5 border border-white/10 rounded-lg p-4 mb-6">
+            <p class="text-white/40 text-xs uppercase tracking-wider mb-2">Identificadores del sistema (no editables)</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <div>
+                    <span class="text-white/50">Usuario: </span>
+                    <span class="text-white font-mono">{{nombre_usuario}}</span>
+                </div>
+                <div>
+                    <span class="text-white/50">Legajo: </span>
+                    <span class="text-white font-mono">{{legajo}}</span>
+                </div>
+            </div>
+        </div>
+
+        <form action="/estudiante/edit/{{id}}" method="post" class="space-y-4">
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[#ccd0fc] text-sm font-medium mb-1">Nombre *</label>
+                    <input type="text" name="nombre" value="{{nombre}}" required
+                           class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 text-black">
+                </div>
+                <div>
+                    <label class="block text-[#ccd0fc] text-sm font-medium mb-1">Apellido *</label>
+                    <input type="text" name="apellido" value="{{apellido}}" required
+                           class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 text-black">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-[#ccd0fc] text-sm font-medium mb-1">DNI</label>
+                <input type="text" name="dni" value="{{dni}}"
+                       class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 text-black">
+            </div>
+
+            <div>
+                <label class="block text-[#ccd0fc] text-sm font-medium mb-1">Dirección</label>
+                <input type="text" name="direccion" value="{{direccion}}"
+                       class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 text-black">
+            </div>
+
+            <div>
+                <label class="block text-[#ccd0fc] text-sm font-medium mb-1">Teléfono</label>
+                <input type="text" name="telefono" value="{{telefono}}"
+                       class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 text-black">
+            </div>
+
+            <div>
+                <label class="block text-[#ccd0fc] text-sm font-medium mb-1">Tipo de estudiante *</label>
+                <select name="tipo_estudiante" required
+                        class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 text-black">
+                    <option value="REGULAR"     {{#esRegular}}selected{{/esRegular}}>Regular</option>
+                    <option value="VOCACIONAL"  {{#esVocacional}}selected{{/esVocacional}}>Vocacional</option>
+                    <option value="INTERCAMBIO" {{#esIntercambio}}selected{{/esIntercambio}}>Intercambio</option>
+                </select>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button type="submit"
+                        class="flex-1 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition duration-300 font-semibold">
+                    Guardar cambios
+                </button>
+                <a href="/configuracion#estudiantes"
+                   class="flex-1 text-center bg-white/10 text-[#ccd0fc] py-2 px-4 rounded-md hover:bg-white/20 transition duration-300">
+                    Cancelar
+                </a>
+            </div>
+
+        </form>
+    </div>
+</body>
+</html>
