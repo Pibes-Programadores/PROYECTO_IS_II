@@ -4,15 +4,21 @@
     <meta charset="UTF-8">
     <title>SiGU - Panel - {{nombreMateria}}</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
 </head>
-<body class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] min-h-screen p-6 flex flex-col items-center">
-    <div class="w-full max-w-4xl space-y-8">
+<body class="bg-[#f4f6f9] dark:bg-[#1e2a3a]">
+    {{> _layout_header}}
+    <div class="w-full max-w-4xl mx-auto space-y-8 p-4 md:p-8">
 
         <!-- Encabezado -->
-        <div class="bg-[#190019]/60 border border-purple-700/40 rounded-lg p-6">
-            <p class="text-purple-400 text-sm font-mono uppercase tracking-widest mb-1">Código {{codigoMateria}}</p>
-            <h1 class="text-3xl font-bold text-white">{{nombreMateria}}</h1>
-            <p class="text-[#ccd0fc] text-sm mt-1">Año de cursada: {{anioMateria}}° — {{periodoMateria}}</p>
+        <div class="bg-white dark:bg-[#2a3a4d] border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm">
+            <p class="text-gray-500 dark:text-gray-400 text-sm font-mono uppercase tracking-widest mb-1">Código {{codigoMateria}}</p>
+            <h1 class="text-3xl font-bold text-[#1a3a5c] dark:text-white">{{nombreMateria}}</h1>
+            <p class="text-gray-600 dark:text-gray-300 text-sm mt-1">Año de cursada: {{anioMateria}}° — {{periodoMateria}}</p>
         </div>
 
         {{#successMessage}}
@@ -28,100 +34,101 @@
         {{/errorMessage}}
 
         <!-- SECCIÓN 1: Anuncios -->
-        <div class="bg-[#190019]/60 border border-yellow-700/40 rounded-lg p-6 shadow-lg">
-            <h2 class="text-2xl font-bold text-yellow-400 mb-4">📢 Publicar Anuncio</h2>
+        <div class="bg-white dark:bg-[#2a3a4d] border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm">
+            <h2 class="text-2xl font-bold text-[#1a3a5c] dark:text-white mb-4 border-b border-[#2471a3] dark:border-blue-400 pb-2">📢 Publicar Anuncio</h2>
             <form action="/docente/materia/{{codigoMateria}}/anuncio" method="post" class="space-y-4">
                 <div>
-                    <label class="block text-[#ccd0fc] text-sm font-medium mb-1">Tipo de Anuncio:</label>
+                    <label class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Tipo de Anuncio:</label>
                     <select name="tipo" id="tipoAnuncio" onchange="toggleFechaExamen(this)"
-                            class="w-full px-4 py-2 border rounded-md bg-white text-gray-900 focus:ring-2 focus:ring-yellow-500">
+                            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#2471a3]">
                         <option value="GENERAL">General</option>
                         <option value="EXAMEN">Examen / Fecha de Evaluación</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-[#ccd0fc] text-sm font-medium mb-1">Título:</label>
+                    <label class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Título:</label>
                     <input type="text" name="titulo" required
-                           class="w-full px-4 py-2 border rounded-md text-gray-900 focus:ring-2 focus:ring-yellow-500"
+                           class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#2471a3]"
                            placeholder="Ej: Parcial 1 — Unidades 1 a 3">
                 </div>
                 <div>
-                    <label class="block text-[#ccd0fc] text-sm font-medium mb-1">Contenido:</label>
+                    <label class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Contenido:</label>
                     <textarea name="contenido" rows="3" required
-                              class="w-full px-4 py-2 border rounded-md text-gray-900 focus:ring-2 focus:ring-yellow-500"
+                              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#2471a3]"
                               placeholder="Detalle del anuncio..."></textarea>
                 </div>
                 <div id="fechaExamenContainer" class="hidden">
-                    <label class="block text-[#ccd0fc] text-sm font-medium mb-1">Fecha del Examen:</label>
+                    <label class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Fecha del Examen:</label>
                     <input type="date" name="fecha_examen"
-                           class="w-full px-4 py-2 border rounded-md text-gray-900 focus:ring-2 focus:ring-yellow-500">
+                           class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#2471a3]">
                 </div>
                 <button type="submit"
-                        class="w-full bg-yellow-500 text-white py-2 px-4 rounded-md hover:bg-yellow-600 transition duration-300 font-medium">
+                        class="w-full bg-[#2471a3] text-white py-2 px-4 rounded-md hover:bg-[#1a5276] transition-colors duration-300 font-medium focus:outline-none focus:ring-2 focus:ring-[#2471a3] focus:ring-offset-2">
                     Publicar Anuncio
                 </button>
             </form>
         </div>
 
         <!-- SECCIÓN 2: Cargar Notas -->
-        <div class="bg-[#190019]/60 border border-green-700/40 rounded-lg p-6 shadow-lg">
-            <h2 class="text-2xl font-bold text-green-400 mb-4">📝 Cargar Nota</h2>
+        <div class="bg-white dark:bg-[#2a3a4d] border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm">
+            <h2 class="text-2xl font-bold text-[#1a3a5c] dark:text-white mb-4 border-b border-green-500 dark:border-green-400 pb-2 flex items-center gap-2"><span>📝 </span> Cargar Nota</h2>
             {{#hayAlumnos}}
             <form action="/docente/materia/{{codigoMateria}}/nota" method="post" class="space-y-4">
                 <div>
-                    <label class="block text-[#ccd0fc] text-sm font-medium mb-1">Alumno:</label>
+                    <label class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Alumno:</label>
                     <select name="student_id" required
-                            class="w-full px-4 py-2 border rounded-md bg-white text-gray-900 focus:ring-2 focus:ring-green-500">
+                            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-600">
                         <option value="">— Seleccioná un alumno —</option>
                         {{#alumnos}}
                         <option value="{{id}}">{{label}}</option>
                         {{/alumnos}}
                     </select>
                 </div>
-                            <div>
-                <label class="block text-[#ccd0fc] text-sm font-medium mb-1">Nota (0.00 — 10.00):</label>
-                <input type="number" name="valor" min="0" max="10" step="0.01" required
-                       class="w-full px-4 py-2 border rounded-md text-gray-900 focus:ring-2 focus:ring-green-500"
-                       placeholder="Ej: 7.50">
-            </div>
-            <div>
-                <label class="block text-[#ccd0fc] text-sm font-medium mb-1">Estado de Cursada:</label>
-                <select name="estado_cursada" required
-                        class="w-full px-4 py-2 border rounded-md bg-white text-gray-900 focus:ring-2 focus:ring-green-500">
-                    <option value="REGULAR">Regular</option>
-                    <option value="LIBRE">Libre</option>
-                    <option value="PROMOCION">Promoción (exime de final)</option>
-                </select>
-            </div>
-            <button type="submit"
-                        class="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition duration-300 font-medium">
+                <div>
+                    <label class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Nota (0.00 — 10.00):</label>
+                    <input type="number" name="valor" min="0" max="10" step="0.01" required
+                           class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-600"
+                           placeholder="Ej: 7.50">
+                </div>
+                <div>
+                    <label class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Estado de Cursada:</label>
+                    <select name="estado_cursada" required
+                            class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-600">
+                        <option value="REGULAR">Regular</option>
+                        <option value="LIBRE">Libre</option>
+                        <option value="PROMOCION">Promoción (exime de final)</option>
+                    </select>
+                </div>
+                <button type="submit"
+                        class="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition-colors duration-300 font-medium focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2">
                     Registrar Nota
                 </button>
             </form>
             {{/hayAlumnos}}
             {{^hayAlumnos}}
-            <p class="text-[#ccd0fc] text-sm bg-[#190019]/80 p-4 rounded-md border border-purple-500/30">
+            <p class="text-gray-600 dark:text-gray-400 text-sm bg-gray-50 dark:bg-[#1a2b3c] p-4 rounded-md border border-gray-200 dark:border-gray-600 italic">
                 Actualmente no hay alumnos inscriptos en esta comisión.
             </p>
             {{/hayAlumnos}}
         </div>
-                <!-- SECCIÓN ANUNCIOS PUBLICADOS -->
+
+        <!-- SECCIÓN ANUNCIOS PUBLICADOS -->
         {{#anuncios}}
-        <div class="bg-[#190019]/60 border border-yellow-700/20 rounded-lg p-6 shadow-lg">
-            <h2 class="text-xl font-bold text-yellow-300 mb-4">📋 Anuncios Publicados</h2>
+        <div class="bg-white dark:bg-[#2a3a4d] border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm">
+            <h2 class="text-xl font-bold text-[#1a3a5c] dark:text-white mb-4 border-b border-yellow-500 dark:border-yellow-400 pb-2 flex items-center gap-2"><span>📋</span> Anuncios Publicados</h2>
             <div class="space-y-3">
                 {{#anuncios}}
-                <div class="bg-white/10 rounded-md p-4">
-                    <div class="flex justify-between items-start">
+                <div class="bg-gray-50 dark:bg-[#1a2b3c] border border-gray-200 dark:border-gray-600 rounded-md p-4">
+                    <div class="flex flex-col sm:flex-row justify-between items-start">
                         <div>
-                            <span class="text-xs font-mono uppercase text-yellow-400">{{tipo}}</span>
-                            <p class="text-white font-semibold">{{titulo}}</p>
-                            <p class="text-[#ccd0fc] text-sm">{{contenido}}</p>
-                            {{#fechaExamen}}<p class="text-yellow-300 text-xs mt-1">📅 Fecha: {{fechaExamen}}</p>{{/fechaExamen}}
+                            <span class="text-xs font-mono uppercase font-bold tracking-wider {{#esExamen}}text-red-600 dark:text-red-400{{/esExamen}}{{^esExamen}}text-blue-600 dark:text-blue-400{{/esExamen}}">{{tipo}}</span>
+                            <p class="text-gray-900 dark:text-white font-semibold mt-1">{{titulo}}</p>
+                            <p class="text-gray-700 dark:text-gray-300 text-sm mt-1">{{contenido}}</p>
+                            {{#fechaExamen}}<p class="text-red-600 dark:text-red-400 font-medium text-xs mt-2 flex items-center gap-1"><span>📅</span> Fecha: {{fechaExamen}}</p>{{/fechaExamen}}
                         </div>
                         {{#esExamen}}
-                        <div class="text-right ml-4">
-                            <span class="inline-block bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+                        <div class="mt-3 sm:mt-0 sm:ml-4 text-right">
+                            <span class="inline-block bg-[#2471a3] text-white text-xs font-bold px-3 py-1 rounded-full">
                                 {{inscriptosCount}} inscripto(s)
                             </span>
                         </div>
@@ -132,42 +139,43 @@
             </div>
         </div>
         {{/anuncios}}
+
         <!-- SECCIÓN 3: Asignar Aula -->
-        <div class="bg-[#190019]/60 border border-blue-700/40 rounded-lg p-6 shadow-lg">
-            <h2 class="text-2xl font-bold text-blue-400 mb-4">🏫 Asignar Aula</h2>
+        <div class="bg-white dark:bg-[#2a3a4d] border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm">
+            <h2 class="text-2xl font-bold text-[#1a3a5c] dark:text-white mb-4 border-b border-indigo-500 dark:border-indigo-400 pb-2 flex items-center gap-2"><span>🏫</span> Asignar Aula</h2>
             <form action="/docente/materia/{{codigoMateria}}/aula" method="post" class="space-y-4">
                 <div>
-                    <label class="block text-[#ccd0fc] text-sm font-medium mb-1">Número / Nombre del Aula:</label>
+                    <label class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Número / Nombre del Aula:</label>
                     <input type="text" name="aula" required
-                           class="w-full px-4 py-2 border rounded-md text-gray-900 focus:ring-2 focus:ring-blue-500"
+                           class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-600"
                            placeholder="Ej: Aula 12 — Edificio A">
                 </div>
                 <button type="submit"
-                        class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition duration-300 font-medium">
+                        class="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 transition-colors duration-300 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2">
                     Confirmar Asignación
                 </button>
             </form>
         </div>
 
         <!-- SECCIÓN 4: Subir Contenido -->
-        <div class="bg-[#190019]/60 border border-pink-700/40 rounded-lg p-6 shadow-lg">
-            <h2 class="text-2xl font-bold text-pink-400 mb-2">📁 Subir Contenido</h2>
-            <p class="text-[#ccd0fc] text-sm mb-4">Subí apuntes, presentaciones y materiales de estudio para tus alumnos.</p>
+        <div class="bg-white dark:bg-[#2a3a4d] border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm">
+            <h2 class="text-2xl font-bold text-[#1a3a5c] dark:text-white mb-2 border-b border-pink-500 dark:border-pink-400 pb-2 flex items-center gap-2"><span>📝</span> Subir Contenido</h2>
+            <p class="text-gray-600 dark:text-gray-300 text-sm mb-4">Subí apuntes, presentaciones y materiales de estudio para tus alumnos.</p>
             <a href="/docente/materia/{{codigoMateria}}/contenido"
-               class="inline-block bg-pink-600 text-white py-2 px-6 rounded-md hover:bg-pink-700 transition duration-300 font-medium">
+               class="inline-block bg-pink-600 text-white py-2 px-6 rounded-md hover:bg-pink-700 transition-colors duration-300 font-medium focus:outline-none focus:ring-2 focus:ring-pink-600 focus:ring-offset-2">
                 Ir a Subir Contenido →
             </a>
         </div>
 
-                <!-- Navegación -->
-        <div class="text-center pb-6 space-y-2">
+        <!-- Navegación -->
+        <div class="text-center pb-6 space-y-4 mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
             <div>
-                <a href="/docente/notas-finales" class="inline-block bg-indigo-600 text-white py-2 px-6 rounded-md hover:bg-indigo-700 transition duration-300 font-medium text-sm">
+                <a href="/docente/notas-finales" class="inline-block bg-white dark:bg-[#1e2a3a] border border-gray-300 dark:border-gray-600 text-[#1a3a5c] dark:text-white py-2 px-6 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-300 font-medium text-sm shadow-sm">
                     📋 Ir a Carga de Actas de Finales
                 </a>
             </div>
             <div>
-                <a href="/docente/materias" class="text-purple-300 hover:underline text-sm">← Volver a Mis Materias</a>
+                <a href="/docente/materias" class="text-[#2471a3] dark:text-[#eaf2ff] hover:underline transition-colors text-sm">← Volver a Mis Materias</a>
             </div>
         </div>
     </div>
@@ -184,5 +192,6 @@
             }
         }
     </script>
+    {{> _layout_footer}}
 </body>
 </html>

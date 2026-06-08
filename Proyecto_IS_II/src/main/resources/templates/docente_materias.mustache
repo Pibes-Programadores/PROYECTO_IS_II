@@ -4,11 +4,17 @@
     <meta charset="UTF-8">
     <title>SiGU - Mis Materias</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
 </head>
-<body class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] min-h-screen p-6 flex flex-col items-center">
-    <div class="w-full max-w-5xl bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-xl border border-purple-900/30">
-        <h1 class="text-3xl font-bold text-center text-white mb-2">Mis Materias Asignadas</h1>
-        <p class="text-center text-[#ccd0fc] mb-8">Seleccioná una materia para gestionar su contenido.</p>
+<body class="bg-[#f4f6f9] dark:bg-[#1e2a3a]">
+    {{> _layout_header}}
+    <div class="w-full max-w-5xl bg-white dark:bg-[#2a3a4d] p-8 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 mx-auto mt-8 md:mt-12">
+        <h1 class="text-3xl font-bold text-center text-[#1a3a5c] dark:text-white mb-2">Mis Materias Asignadas</h1>
+        <p class="text-center text-gray-600 dark:text-gray-400 mb-8">Seleccioná una materia para gestionar su contenido.</p>
 
         {{#successMessage}}
         <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4">
@@ -23,30 +29,31 @@
         {{/errorMessage}}
 
         {{#sinMaterias}}
-        <div class="bg-amber-900/30 border border-amber-600/50 text-amber-200 p-6 rounded-md text-center">
+        <div class="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-200 p-6 rounded-md text-center">
             ⚠️ No tenés materias asignadas aún. Contactá a la Secretaría Académica.
         </div>
         {{/sinMaterias}}
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {{#materias}}
-            <div class="bg-[#190019]/60 border border-purple-700/40 rounded-lg p-6 flex flex-col justify-between shadow-lg hover:border-purple-500 transition duration-200">
+            <div class="bg-gray-50 dark:bg-[#1a2b3c] border border-gray-200 dark:border-gray-600 rounded-lg p-6 flex flex-col justify-between shadow-sm hover:shadow-md hover:border-[#2471a3] dark:hover:border-blue-400 transition-all duration-200">
                 <div>
-                    <span class="text-xs font-mono text-purple-400 uppercase tracking-widest">Código {{codigo}}</span>
-                    <h2 class="text-xl font-bold text-white mt-1 mb-3">{{nombre}}</h2>
-                    <p class="text-[#ccd0fc] text-sm">Año de cursada: <span class="font-semibold">{{anio_cursada}}°</span></p>
+                    <span class="text-xs font-mono text-gray-500 dark:text-gray-400 uppercase tracking-widest">Código {{codigo}}</span>
+                    <h2 class="text-xl font-bold text-[#1a3a5c] dark:text-white mt-1 mb-3">{{nombre}}</h2>
+                    <p class="text-gray-600 dark:text-gray-300 text-sm">Año de cursada: <span class="font-semibold">{{anio_cursada}}°</span></p>
                 </div>
                 <a href="/docente/materia/{{codigo}}"
-                   class="mt-5 inline-block text-center bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 transition duration-300 font-medium">
+                   class="mt-5 inline-block text-center bg-[#2471a3] text-white py-2 px-4 rounded-md hover:bg-[#1a5276] transition-colors duration-300 font-medium focus:outline-none focus:ring-2 focus:ring-[#2471a3] focus:ring-offset-2">
                     Ingresar →
                 </a>
             </div>
             {{/materias}}
         </div>
 
-        <div class="text-center mt-8">
-            <a href="/dashboard" class="text-purple-300 hover:underline text-sm"> Volver al panel principal</a>
+        <div class="text-center mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <a href="/dashboard" class="text-[#2471a3] dark:text-[#eaf2ff] hover:underline transition-colors text-sm">← Volver al panel principal</a>
         </div>
     </div>
+    {{> _layout_footer}}
 </body>
 </html>

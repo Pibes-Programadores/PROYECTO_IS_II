@@ -4,10 +4,16 @@
     <meta charset="UTF-8">
     <title>SiGU - Cargar Nueva Materia</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
 </head>
-<body class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] flex items-center justify-center min-h-screen p-4">
-    <div class="w-full bg-gradient-to-b from-[#190019] to-[#dfb6b2] p-8 rounded-lg shadow-lg w-full max-w-2xl">
-        <h1 class="text-3xl font-bold text-center text-green-400 mb-6">Alta de Materia y Configuración Académica</h1>
+<body class="bg-[#f4f6f9] dark:bg-[#1e2a3a]">
+    {{> _layout_header}}
+    <div class="w-full max-w-3xl bg-white dark:bg-[#2a3a4d] p-8 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 mx-auto">
+        <h1 class="text-3xl font-bold text-center text-[#1a3a5c] dark:text-white mb-6">Alta de Materia y Configuración Académica</h1>
 
         {{#successMessage}}
         <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4">
@@ -23,44 +29,44 @@
 
         <form action="/materia/new" method="post" class="space-y-4">
             
-            <h2 class="text-xl font-semibold text-[#ccd0fc] border-b border-green-500 pb-1">1. Datos de la Asignatura</h2>
+            <h2 class="text-xl font-semibold text-[#1a3a5c] dark:text-white border-b border-[#2471a3] dark:border-blue-400 pb-1">1. Datos de la Asignatura</h2>
             
             <div class="mt-4">
-                <label for="plan_estudio_id" class="block text-[#ccd0fc] text-sm font-medium mb-1">Carrera y Plan de Estudio:</label>
-                <select id="plan_estudio_id" name="plan_estudio_id" required class="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-green-500 bg-white text-gray-900">
+                <label for="plan_estudio_id" class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Carrera y Plan de Estudio:</label>
+                <select id="plan_estudio_id" name="plan_estudio_id" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2471a3] bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                     <option value="">-- Seleccione una Carrera / Plan --</option>
                     {{#planes}}
                     <option value="{{id}}">{{descripcion}}</option>
                     {{/planes}}
-                </select>
+                    </select>
             </div>
 
             <div class="grid grid-cols-2 gap-4 mt-4">
                 <div>
-                    <label for="codigo" class="block text-[#ccd0fc] text-sm font-medium mb-1">Código de Materia:</label>
-                    <input type="text" id="codigo" name="codigo" required inputmode="numeric" pattern="\d+" title="Ingrese únicamente números positivos (ej: 3398)" class="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-green-500 text-gray-900" placeholder="Ej: 3398">
+                    <label for="codigo" class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Código de Materia:</label>
+                    <input type="text" id="codigo" name="codigo" required inputmode="numeric" pattern="\d+" title="Ingrese únicamente números positivos (ej: 3398)" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2471a3] bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="Ej: 3398">
                 </div>
                 <div>
-                    <label for="nombre" class="block text-[#ccd0fc] text-sm font-medium mb-1">Nombre de la Materia:</label>
-                    <input type="text" id="nombre" name="nombre" required class="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-green-500 text-gray-900" placeholder="Ej: Ingeniería de Software I">
+                    <label for="nombre" class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Nombre de la Materia:</label>
+                    <input type="text" id="nombre" name="nombre" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2471a3] bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="Ej: Ingeniería de Software I">
                 </div>
             </div>
             
             <div class="grid grid-cols-2 gap-4 mt-4">
                 <div>
-                    <label for="anio_cursada" class="block text-[#ccd0fc] text-sm font-medium mb-1">Año de Cursada (1° a 5°):</label>
-                    <input type="number" id="anio_cursada" name="anio_cursada" min="1" max="6" required class="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-green-500 text-gray-900">
+                    <label for="anio_cursada" class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Año de Cursada (1° a 5°):</label>
+                    <input type="number" id="anio_cursada" name="anio_cursada" min="1" max="6" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2471a3] bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                 </div>
                 <div>
-                    <label for="carga_horaria_total" class="block text-[#ccd0fc] text-sm font-medium mb-1">Carga Horaria Total:</label>
-                    <input type="number" id="carga_horaria_total" name="carga_horaria_total" min="1" class="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-green-500 text-gray-900" placeholder="Ej: 96">
+                    <label for="carga_horaria_total" class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Carga Horaria Total:</label>
+                    <input type="number" id="carga_horaria_total" name="carga_horaria_total" min="1" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2471a3] bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="Ej: 96">
                 </div>
             </div>
 
-            <h2 class="text-xl font-semibold text-[#ccd0fc] border-b border-green-500 pb-1 pt-4">2. Periodo de Dictado</h2>
+            <h2 class="text-xl font-semibold text-[#1a3a5c] dark:text-white border-b border-[#2471a3] dark:border-blue-400 pb-1 pt-4">2. Periodo de Dictado</h2>
             <div>
-                <label for="tipo_cuatrimestre" class="block text-[#ccd0fc] text-sm font-medium mb-1">Régimen de Cursado:</label>
-                <select id="tipo_cuatrimestre" name="tipo_cuatrimestre" required class="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-green-500 bg-white text-gray-900">
+                <label for="tipo_cuatrimestre" class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Régimen de Cursado:</label>
+                <select id="tipo_cuatrimestre" name="tipo_cuatrimestre" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2471a3] bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                     <option value="PRIMER_CUATRIMESTRE">Primer Cuatrimestre</option>
                     <option value="SEGUNDO_CUATRIMESTRE">Segundo Cuatrimestre</option>
                     <option value="ANUAL">Anual</option>
@@ -68,18 +74,18 @@
                 </select>
             </div>
 
-            <h2 class="text-xl font-semibold text-[#ccd0fc] border-b border-green-500 pb-1 pt-4 flex justify-between items-center">
-                3. Régimen de Correlatividades
-                <button type="button" onclick="agregarCorrelatividad()" class="text-sm bg-green-700 hover:bg-green-600 text-white py-1 px-3 rounded-md transition">
-                    + Seleccionar otra correlatividad
+            <h2 class="text-xl font-semibold text-[#1a3a5c] dark:text-white border-b border-[#2471a3] dark:border-blue-400 pb-1 pt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <span>3. Régimen de Correlatividades</span>
+                <button type="button" onclick="agregarCorrelatividad()" class="text-sm bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-800 dark:text-white py-1 px-3 rounded-md transition-colors border border-gray-300 dark:border-gray-500">
+                    + Añadir correlatividad
                 </button>
             </h2>
             
             <div id="correlatividades_container" class="space-y-4 mt-4">
-                <div class="corr-row bg-[#190019]/40 p-4 rounded-md border border-green-500/30 grid grid-cols-2 gap-4">
+                <div class="corr-row bg-gray-50 dark:bg-[#1a2b3c] p-4 rounded-md border border-gray-200 dark:border-gray-600 grid grid-cols-2 gap-4">
                     <div class="col-span-2">
-                        <label class="block text-[#ccd0fc] text-sm font-medium mb-1">Asignatura Vinculada (Opcional):</label>
-                        <select name="materia_correlativa_codigo" class="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-green-500 bg-white text-gray-900">
+                        <label class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Asignatura Vinculada (Opcional):</label>
+                        <select name="materia_correlativa_codigo" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2471a3] bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                             <option value="none">-- Ninguna --</option>
                             {{#materiasExistentes}}
                             <option value="{{codigo}}">[{{codigo}}] - {{nombre}}</option>
@@ -88,24 +94,24 @@
                     </div>
                     
                     <div class="col-span-2 md:col-span-1">
-                        <label class="block text-[#ccd0fc] text-sm font-medium mb-1">Tipo de Requisito:</label>
-                        <select name="tipo_requisito" class="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-green-500 bg-white text-gray-900">
+                        <label class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Tipo de Requisito:</label>
+                        <select name="tipo_requisito" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2471a3] bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                             <option value="CURSAR">Requisito para CURSAR</option>
                             <option value="RENDIR">Requisito para RENDIR (Final)</option>
                         </select>
                     </div>
                     
                     <div class="col-span-2 md:col-span-1">
-                        <label class="block text-[#ccd0fc] text-sm font-medium mb-1">Condición Exigida:</label>
-                        <select name="condicion" class="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-green-500 bg-white text-gray-900">
+                        <label class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Condición Exigida:</label>
+                        <select name="condicion" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2471a3] bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                             <option value="APROBADA">Tenerla Aprobada</option>
                             <option value="REGULAR">Tenerla Regular</option>
                         </select>
                     </div>
 
                     <div class="col-span-2">
-                        <label class="block text-[#ccd0fc] text-sm font-medium mb-1">Sentido de Relación:</label>
-                        <select name="sentido_correlatividad" class="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-green-500 bg-white text-gray-900">
+                        <label class="block text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Sentido de Relación:</label>
+                        <select name="sentido_correlatividad" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2471a3] bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                             <option value="REQUIERE">Esta nueva materia REQUIERE de la seleccionada</option>
                             <option value="ES_REQUISITO">Esta nueva materia ES REQUISITO para la seleccionada</option>
                         </select>
@@ -134,14 +140,15 @@
                 }
             </script>
 
-            <button type="submit" class="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition duration-300 mt-6">
+            <button type="submit" class="w-full bg-[#2471a3] text-white py-2 px-4 rounded-md hover:bg-[#1a5276] transition-colors focus:ring-2 focus:ring-offset-2 focus:ring-[#2471a3] mt-6">
                 Dar de Alta Materia
             </button>
             
             <div class="text-center mt-4">
-                <a href="/dashboard" class="text-green-400 hover:underline text-sm">← Volver al panel principal</a>
+                <a href="/dashboard" class="text-[#2471a3] dark:text-[#eaf2ff] hover:underline text-sm transition-colors">← Volver al panel principal</a>
             </div>
         </form>
     </div>
+    {{> _layout_footer}}
 </body>
 </html>
