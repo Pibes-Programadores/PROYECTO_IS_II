@@ -17,7 +17,7 @@ public final class DBConfigSingleton {
 
         // Leemos variables de entorno (ideal para prod), si no existen, usamos valores por defecto (dev)
         String envUrl = System.getenv("DB_URL");
-        this.dbUrl = (envUrl != null) ? envUrl : "jdbc:mysql://localhost:3307/proyecto_is_ii?useSSL=false&serverTimezone=UTC";
+        this.dbUrl = (envUrl != null) ? envUrl : "jdbc:mysql://localhost:3306/proyecto_is_ii?useSSL=false&serverTimezone=UTC";
 
         String envUser = System.getenv("DB_USER");
         this.user = (envUser != null) ? envUser : "dev";
